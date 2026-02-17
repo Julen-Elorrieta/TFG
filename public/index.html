@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="es" data-theme="dark">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NeuralChat</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap"
+    rel="stylesheet" />
+  <link rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/tokyo-night-dark.min.css" id="hljs-theme" />
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+</head>
+
+<body>
+  <div id="app">
+    <!-- SIDEBAR -->
+    <aside id="sidebar">
+      <div class="sidebar-header">
+        <div class="logo">
+          <div class="logo-icon">&#x26A1;</div>
+          NeuralChat
+        </div>
+      </div>
+
+      <button id="btn-new-chat" onclick="newConversation()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <line x1="12" y1="5" x2="12" y2="19" />
+          <line x1="5" y1="12" x2="19" y2="12" />
+        </svg>
+        Nueva conversaci&#xF3;n
+      </button>
+
+      <div class="sidebar-section-label">Conversaciones</div>
+
+      <div id="conversations-list">
+        <div class="empty-conversations">
+          No hay conversaciones a&#xFA;n.<br />Empieza una nueva.
+        </div>
+      </div>
+
+      <div class="sidebar-footer">
+        <button class="sidebar-footer-btn" onclick="openExport()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+          Exportar conversaci&#xF3;n
+        </button>
+        <button class="sidebar-footer-btn" onclick="toggleTheme()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            id="theme-icon">
+            <circle cx="12" cy="12" r="5" />
+            <line x1="12" y1="1" x2="12" y2="3" />
+            <line x1="12" y1="21" x2="12" y2="23" />
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+            <line x1="1" y1="12" x2="3" y2="12" />
+            <line x1="21" y1="12" x2="23" y2="12" />
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+          </svg>
+          <span id="theme-label">Modo claro</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- MAIN -->
+    <div id="main">
+      <header id="header">
+        <button id="btn-sidebar-toggle" onclick="toggleSidebar()" title="Toggle sidebar">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="3" y1="6" x2="21" y2="6" />
+            <line x1="3" y1="12" x2="21" y2="12" />
+            <line x1="3" y1="18" x2="21" y2="18" />
+          </svg>
+        </button>
+
+        <span id="chat-title-header">Nueva conversaci&#xF3;n</span>
+
+        <div class="header-controls">
+          <div id="service-selector" title="Seleccionar servicio AI">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="3" />
+              <path
+                d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83" />
+            </svg>
+            <select id="service-select" onchange="onServiceChange(this.value)">
+              <option value="auto">Auto (Round-robin)</option>
+            </select>
+            <span id="current-service-badge" class="service-badge">AUTO</span>
+          </div>
+
+          <button class="icon-btn" onclick="toggleSystemPanel()" title="System prompt" id="btn-system">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <line x1="8" y1="12" x2="16" y2="12" />
+              <line x1="8" y1="8" x2="16" y2="8" />
+              <line x1="8" y1="16" x2="12" y2="16" />
+            </svg>
+          </button>
+
+          <button class="icon-btn" onclick="clearCurrentConversation()" title="Limpiar chat">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="3 6 5 6 21 6" />
+              <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
+              <path d="M10 11v6M14 11v6" />
+              <path d="M9 6V4h6v2" />
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      <div id="messages-container">
+        <div id="messages-inner">
+          <div id="welcome">
+            <div class="welcome-logo">&#x26A1;</div>
+            <div class="welcome-title">NeuralChat</div>
+            <div class="welcome-sub">
+              Chat profesional con m&#xFA;ltiples modelos de IA. Env&#xED;a
+              texto, im&#xE1;genes, PDFs y cualquier tipo de archivo.
+            </div>
+            <div class="welcome-chips">
+              <button class="welcome-chip" onclick="
+                    useChip(
+                      'Expl&#xED;came c&#xF3;mo funciona la IA en t&#xE9;rminos simples',
+                    )
+                  ">
+                &#xBF;C&#xF3;mo funciona la IA?
+              </button>
+              <button class="welcome-chip" onclick="
+                    useChip(
+                      'Escribe un script en Python para analizar datos CSV',
+                    )
+                  ">
+                Script Python CSV
+              </button>
+              <button class="welcome-chip" onclick="useChip('Resume los puntos clave de este documento')">
+                Resumir documento
+              </button>
+              <button class="welcome-chip" onclick="
+                    useChip(
+                      '&#xBF;Cu&#xE1;les son las mejores pr&#xE1;cticas en desarrollo web?',
+                    )
+                  ">
+                Mejores pr&#xE1;cticas web
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="input-area">
+        <div id="input-inner">
+          <div id="file-previews"></div>
+          <div class="textarea-wrap" id="textarea-wrap">
+            <textarea id="msg-input" placeholder="Escribe un mensaje... (Enter para enviar)" rows="1"
+              oninput="autoResize(this)" onkeydown="handleKeydown(event)"></textarea>
+            <div class="input-actions">
+              <label class="input-action-btn" title="Adjuntar archivo" style="cursor: pointer">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path
+                    d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
+                </svg>
+                <input type="file" id="file-input" multiple style="display: none" onchange="handleFileInput(event)" />
+              </label>
+              <button id="btn-send" onclick="sendMessage()" title="Enviar (Enter)">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <line x1="22" y1="2" x2="11" y2="13" />
+                  <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                </svg>
+              </button>
+              <button id="btn-stop" onclick="stopStreaming()" title="Cancelar (Esc)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                  <rect x="4" y="4" width="16" height="16" rx="2" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- /main -->
+  </div>
+  <!-- /app -->
+
+  <!-- SYSTEM PROMPT PANEL -->
+  <div id="system-panel">
+    <div class="panel-header">
+      <span class="panel-title">&#x2699;&#xFE0F; System Prompt</span>
+      <button class="icon-btn" onclick="toggleSystemPanel()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18" />
+          <line x1="6" y1="6" x2="18" y2="18" />
+        </svg>
+      </button>
+    </div>
+    <div class="panel-content">
+      <div>
+        <div class="panel-label">Instrucciones del sistema</div>
+        <textarea id="system-prompt-input" placeholder="Ej: Eres un asistente experto en Python..."></textarea>
+      </div>
+      <div style="display: flex; gap: 8px; flex-wrap: wrap">
+        <button class="panel-btn primary" onclick="saveSystemPrompt()">
+          Guardar
+        </button>
+        <button class="panel-btn ghost" onclick="clearSystemPrompt()">
+          Limpiar
+        </button>
+      </div>
+      <div>
+        <div class="panel-label">Plantillas</div>
+        <div style="display: flex; flex-direction: column; gap: 6px">
+          <button class="export-option" onclick="applyTemplate('python')">
+            <span class="export-option-icon">&#x1F40D;</span>
+            <div class="export-option-info">
+              <div class="title">Experto Python</div>
+              <div class="sub">C&#xF3;digo limpio y documentado</div>
+            </div>
+          </button>
+          <button class="export-option" onclick="applyTemplate('translator')">
+            <span class="export-option-icon">&#x1F310;</span>
+            <div class="export-option-info">
+              <div class="title">Traductor</div>
+              <div class="sub">Traducci&#xF3;n precisa y natural</div>
+            </div>
+          </button>
+          <button class="export-option" onclick="applyTemplate('analyst')">
+            <span class="export-option-icon">&#x1F4CA;</span>
+            <div class="export-option-info">
+              <div class="title">Analista de datos</div>
+              <div class="sub">An&#xE1;lisis estructurado</div>
+            </div>
+          </button>
+          <button class="export-option" onclick="applyTemplate('writer')">
+            <span class="export-option-icon">&#x270D;&#xFE0F;</span>
+            <div class="export-option-info">
+              <div class="title">Escritor creativo</div>
+              <div class="sub">Prosa elegante y creativa</div>
+            </div>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- EXPORT PANEL -->
+  <div id="export-panel">
+    <div class="export-overlay" onclick="closeExport()"></div>
+    <div class="export-modal">
+      <button class="export-close" onclick="closeExport()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18" />
+          <line x1="6" y1="6" x2="18" y2="18" />
+        </svg>
+      </button>
+      <h2>&#x1F4E4; Exportar conversaci&#xF3;n</h2>
+      <div class="export-options">
+        <button class="export-option" onclick="exportAs('markdown')">
+          <span class="export-option-icon">&#x1F4DD;</span>
+          <div class="export-option-info">
+            <div class="title">Markdown (.md)</div>
+            <div class="sub">Texto formateado con c&#xF3;digo</div>
+          </div>
+        </button>
+        <button class="export-option" onclick="exportAs('json')">
+          <span class="export-option-icon">&#x1F527;</span>
+          <div class="export-option-info">
+            <div class="title">JSON</div>
+            <div class="sub">Datos estructurados completos</div>
+          </div>
+        </button>
+        <button class="export-option" onclick="exportAs('txt')">
+          <span class="export-option-icon">&#x1F4C4;</span>
+          <div class="export-option-info">
+            <div class="title">Texto plano (.txt)</div>
+            <div class="sub">Sin formato, solo texto</div>
+          </div>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST CONTAINER -->
+  <div id="toast-container"></div>
+
+  <script src="app.js"></script>
+</body>
+
+</html>
