@@ -61,5 +61,6 @@ export const openRouterService: AIService = {
         }
       }
     })();
-  }
+  },
+  model: ''
 };

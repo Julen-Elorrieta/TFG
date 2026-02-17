@@ -29,5 +29,6 @@ export const groqService: AIService = {
         yield chunk.choices[0]?.delta?.content || '';
       }
     })();
-  }
+  },
+  model: ''
 };

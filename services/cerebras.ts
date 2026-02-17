@@ -29,7 +29,8 @@ export const cerebrasService: AIService = {
         yield (chunk as any).choices[0]?.delta?.content || '';
       }
     })();
-  }
+  },
+  model: ''
 };
 
 // Helper para listar modelos disponibles en tu cuenta
