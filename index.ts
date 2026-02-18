@@ -3,7 +3,7 @@ if (process.env.NODE_ENV !== "production") {
   process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 }
 
-import type { AIService, ChatMessage, ServiceConfig } from "./types";
+import type { AIService, ChatMessage } from "./types";
 
 // ── PDF text extraction ─────────────────────────────────────────────────────
 async function extractPdfText(buffer: ArrayBuffer): Promise<string> {

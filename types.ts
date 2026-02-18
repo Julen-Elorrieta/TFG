@@ -9,8 +9,3 @@ export interface AIService {
   chat: (messages: ChatMessage[]) => Promise<AsyncIterable<string>>;
 }
 
-export interface ServiceConfig {
-  key: string;
-  model: string;
-  enabled: boolean;
-}
