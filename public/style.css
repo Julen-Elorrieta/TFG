@@ -166,7 +166,9 @@ a:hover {
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
-  transition: transform var(--transition-slow), width var(--transition-slow);
+  transition:
+    transform var(--transition-slow),
+    width var(--transition-slow);
   z-index: 100;
   overflow: hidden;
 }
@@ -585,7 +587,9 @@ a:hover {
   transform: translateY(-6px) scale(0.97);
   transform-origin: top right;
   pointer-events: none;
-  transition: opacity 0.15s ease, transform 0.15s ease;
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease;
 }
 
 .svc-dropdown.open {
@@ -716,7 +720,11 @@ a:hover {
   align-items: center;
   gap: 10px;
   padding: 10px 16px;
-  background: linear-gradient(135deg, rgba(124, 106, 247, 0.08), rgba(124, 106, 247, 0.04));
+  background: linear-gradient(
+    135deg,
+    rgba(124, 106, 247, 0.08),
+    rgba(124, 106, 247, 0.04)
+  );
   border-bottom: 1px solid var(--accent-dim);
   color: var(--text-secondary);
   font-size: 13px;
@@ -930,7 +938,7 @@ a:hover {
 
 /* Streaming cursor */
 .streaming-cursor::after {
-  content: '▋';
+  content: "▋";
   display: inline-block;
   color: var(--accent);
   animation: blink 0.9s step-end infinite;
@@ -938,7 +946,6 @@ a:hover {
 }
 
 @keyframes blink {
-
   0%,
   100% {
     opacity: 1;
@@ -1138,7 +1145,6 @@ a:hover {
 }
 
 @keyframes float {
-
   0%,
   100% {
     transform: translateY(0);
@@ -1306,7 +1312,9 @@ a:hover {
   border: 1px solid var(--border-strong);
   border-radius: var(--radius);
   padding: 8px 8px 8px 14px;
-  transition: border-color var(--transition), box-shadow var(--transition);
+  transition:
+    border-color var(--transition),
+    box-shadow var(--transition);
 }
 
 .textarea-wrap:focus-within {
@@ -1545,7 +1553,9 @@ a:hover {
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-lg);
   width: min(420px, calc(100vw - 32px));
-  box-shadow: var(--shadow-lg), 0 0 0 1px rgba(255, 255, 255, 0.04);
+  box-shadow:
+    var(--shadow-lg),
+    0 0 0 1px rgba(255, 255, 255, 0.04);
   animation: modalIn 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
   overflow: hidden;
 }
@@ -1716,7 +1726,9 @@ a:hover {
   color: var(--text-muted);
   flex-shrink: 0;
   opacity: 0;
-  transition: opacity var(--transition), transform var(--transition);
+  transition:
+    opacity var(--transition),
+    transform var(--transition);
 }
 
 /* ══════════════════════════════════════════════════════
@@ -2018,7 +2030,6 @@ a:hover {
 }
 
 @keyframes typingBounce {
-
   0%,
   80%,
   100% {

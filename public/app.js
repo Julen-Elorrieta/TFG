@@ -1,29 +1,29 @@
 // ═══════════════════════════════════════════════════════
 //  NEURALCHAT v2 — STATE
 // ═══════════════════════════════════════════════════════
-const API = '';
+const API = "";
 
 // Default models per service
 const DEFAULT_MODELS = {
-  groq: 'moonshotai/kimi-k2-instruct-0905',
-  cerebras: 'gpt-oss-120b',
-  openrouter: 'openrouter/auto',
+  groq: "moonshotai/kimi-k2-instruct-0905",
+  cerebras: "gpt-oss-120b",
+  openrouter: "openrouter/auto",
 };
 
 let state = {
   conversations: {},
   currentId: null,
-  selectedService: 'auto',
+  selectedService: "auto",
   pendingFiles: [],
   streaming: false,
   abortController: null,
   sidebarOpen: true,
-  searchQuery: '',
+  searchQuery: "",
   // API keys & models (stored in localStorage, sent as headers)
   apiKeys: {
-    groq: { key: '', model: DEFAULT_MODELS.groq, enabled: false },
-    cerebras: { key: '', model: DEFAULT_MODELS.cerebras, enabled: false },
-    openrouter: { key: '', model: DEFAULT_MODELS.openrouter, enabled: false },
+    groq: { key: "", model: DEFAULT_MODELS.groq, enabled: false },
+    cerebras: { key: "", model: DEFAULT_MODELS.cerebras, enabled: false },
+    openrouter: { key: "", model: DEFAULT_MODELS.openrouter, enabled: false },
   },
 };
 
@@ -42,10 +42,10 @@ function init() {
 }
 
 function updateSidebarKeysIndicator() {
-  const indicator = document.getElementById('keys-indicator');
+  const indicator = document.getElementById("keys-indicator");
   if (!indicator) return;
   const hasKeys = hasAnyApiKey();
-  indicator.className = 'keys-indicator' + (hasKeys ? ' has-keys' : '');
+  indicator.className = "keys-indicator" + (hasKeys ? " has-keys" : "");
 }
 
 // ═══════════════════════════════════════════════════════
@@ -57,42 +57,51 @@ function saveToStorage() {
       conversations: state.conversations,
       currentId: state.currentId,
       selectedService: state.selectedService,
-      theme: document.documentElement.getAttribute('data-theme'),
+      theme: document.documentElement.getAttribute("data-theme"),
       apiKeys: state.apiKeys,
     };
-    localStorage.setItem('neuralchat_v2', JSON.stringify(toSave));
-  } catch(e) { console.warn('Storage save failed', e); }
+    localStorage.setItem("neuralchat_v2", JSON.stringify(toSave));
+  } catch (e) {
+    console.warn("Storage save failed", e);
+  }
 }
 
 function loadFromStorage() {
   try {
-    const raw = localStorage.getItem('neuralchat_v2') || localStorage.getItem('neuralchat_state');
+    const raw =
+      localStorage.getItem("neuralchat_v2") ||
+      localStorage.getItem("neuralchat_state");
     if (!raw) return;
     const saved = JSON.parse(raw);
     const convs = saved.conversations || {};
-    Object.values(convs).forEach(conv => {
-      (conv.messages || []).forEach(msg => {
-        if (msg.role === 'user' && msg.rawText !== undefined) {
+    Object.values(convs).forEach((conv) => {
+      (conv.messages || []).forEach((msg) => {
+        if (msg.role === "user" && msg.rawText !== undefined) {
           msg.content = msg.rawText || msg.content;
           msg.displayText = msg.rawText || msg.displayText || msg.content;
         }
-        (msg.files || []).forEach(f => { delete f.fileContent; });
+        (msg.files || []).forEach((f) => {
+          delete f.fileContent;
+        });
       });
     });
     state.conversations = convs;
     state.currentId = saved.currentId || null;
-    state.selectedService = saved.selectedService || 'auto';
-    if (saved.theme) document.documentElement.setAttribute('data-theme', saved.theme);
+    state.selectedService = saved.selectedService || "auto";
+    if (saved.theme)
+      document.documentElement.setAttribute("data-theme", saved.theme);
     if (saved.apiKeys) {
       // Merge saved keys into defaults (handles new service additions)
-      Object.keys(saved.apiKeys).forEach(k => {
+      Object.keys(saved.apiKeys).forEach((k) => {
         if (state.apiKeys[k]) {
           state.apiKeys[k] = { ...state.apiKeys[k], ...saved.apiKeys[k] };
         }
       });
     }
     updateThemeUI();
-  } catch(e) { console.warn('Storage load failed', e); }
+  } catch (e) {
+    console.warn("Storage load failed", e);
+  }
 }
 
 // ═══════════════════════════════════════════════════════
@@ -102,83 +111,97 @@ function getApiHeaders() {
   const headers = {};
   const keys = state.apiKeys;
   if (keys.groq.key) {
-    headers['X-Groq-Key'] = keys.groq.key;
-    headers['X-Groq-Model'] = keys.groq.model || DEFAULT_MODELS.groq;
+    headers["X-Groq-Key"] = keys.groq.key;
+    headers["X-Groq-Model"] = keys.groq.model || DEFAULT_MODELS.groq;
   }
   if (keys.cerebras.key) {
-    headers['X-Cerebras-Key'] = keys.cerebras.key;
-    headers['X-Cerebras-Model'] = keys.cerebras.model || DEFAULT_MODELS.cerebras;
+    headers["X-Cerebras-Key"] = keys.cerebras.key;
+    headers["X-Cerebras-Model"] =
+      keys.cerebras.model || DEFAULT_MODELS.cerebras;
   }
   if (keys.openrouter.key) {
-    headers['X-Openrouter-Key'] = keys.openrouter.key;
-    headers['X-Openrouter-Model'] = keys.openrouter.model || DEFAULT_MODELS.openrouter;
+    headers["X-Openrouter-Key"] = keys.openrouter.key;
+    headers["X-Openrouter-Model"] =
+      keys.openrouter.model || DEFAULT_MODELS.openrouter;
   }
   return headers;
 }
 
 function hasAnyApiKey() {
-  return Object.values(state.apiKeys).some(s => s.key.trim() !== '');
+  return Object.values(state.apiKeys).some((s) => s.key.trim() !== "");
 }
 
 const SERVICE_META = {
-  auto:        { icon: '⚡', label: 'Auto', sub: 'Round-robin automático' },
-  groq:        { icon: '⚡', label: 'Groq',        sub: 'Ultra-rápido' },
-  cerebras:    { icon: '🧠', label: 'Cerebras',    sub: 'Alto rendimiento' },
-  openrouter:  { icon: '🌐', label: 'OpenRouter',  sub: 'Múltiples modelos' },
+  auto: { icon: "⚡", label: "Auto", sub: "Round-robin automático" },
+  groq: { icon: "⚡", label: "Groq", sub: "Ultra-rápido" },
+  cerebras: { icon: "🧠", label: "Cerebras", sub: "Alto rendimiento" },
+  openrouter: { icon: "🌐", label: "OpenRouter", sub: "Múltiples modelos" },
 };
 
 async function loadServices() {
   try {
     const res = await fetch(`${API}/services`, { headers: getApiHeaders() });
     const data = await res.json();
-    const services = data.services.length > 0 ? data.services : (hasAnyApiKey() ? [] : ['auto', 'groq', 'cerebras', 'openrouter']);
+    const services =
+      data.services.length > 0
+        ? data.services
+        : hasAnyApiKey()
+          ? []
+          : ["auto", "groq", "cerebras", "openrouter"];
     renderServiceDropdown(services);
-  } catch(e) {
-    renderServiceDropdown(['auto', 'groq', 'cerebras', 'openrouter']);
+  } catch (e) {
+    renderServiceDropdown(["auto", "groq", "cerebras", "openrouter"]);
   }
   updateServiceBadge();
   updateInputState();
 }
 
 function renderServiceDropdown(services) {
-  const dropdown = document.getElementById('service-dropdown');
+  const dropdown = document.getElementById("service-dropdown");
   if (!dropdown) return;
 
-  dropdown.innerHTML = `<div class="svc-dropdown-header">Servicio AI</div>` +
-    services.map(svc => {
-      const meta = SERVICE_META[svc] || { icon: '🤖', label: capitalize(svc), sub: '' };
-      const isActive = state.selectedService === svc;
-      return `<button class="svc-option${isActive ? ' active' : ''}" onclick="selectService('${svc}')">
+  dropdown.innerHTML =
+    `<div class="svc-dropdown-header">Servicio AI</div>` +
+    services
+      .map((svc) => {
+        const meta = SERVICE_META[svc] || {
+          icon: "🤖",
+          label: capitalize(svc),
+          sub: "",
+        };
+        const isActive = state.selectedService === svc;
+        return `<button class="svc-option${isActive ? " active" : ""}" onclick="selectService('${svc}')">
         <span class="svc-option-icon">${meta.icon}</span>
         <div class="svc-option-info">
           <div class="svc-option-name">${meta.label}</div>
-          ${meta.sub ? `<div class="svc-option-sub">${meta.sub}</div>` : ''}
+          ${meta.sub ? `<div class="svc-option-sub">${meta.sub}</div>` : ""}
         </div>
         <svg class="svc-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
           <polyline points="20 6 9 17 4 12"/>
         </svg>
       </button>`;
-    }).join('');
+      })
+      .join("");
 }
 
 function toggleServiceDropdown(e) {
   e.stopPropagation();
-  const btn = document.getElementById('service-selector');
-  const dropdown = document.getElementById('service-dropdown');
+  const btn = document.getElementById("service-selector");
+  const dropdown = document.getElementById("service-dropdown");
   if (!btn || !dropdown) return;
-  const isOpen = dropdown.classList.toggle('open');
-  btn.classList.toggle('open', isOpen);
+  const isOpen = dropdown.classList.toggle("open");
+  btn.classList.toggle("open", isOpen);
   if (isOpen) {
     // Close on outside click
     setTimeout(() => {
-      document.addEventListener('click', closeServiceDropdown, { once: true });
+      document.addEventListener("click", closeServiceDropdown, { once: true });
     }, 0);
   }
 }
 
 function closeServiceDropdown() {
-  document.getElementById('service-dropdown')?.classList.remove('open');
-  document.getElementById('service-selector')?.classList.remove('open');
+  document.getElementById("service-dropdown")?.classList.remove("open");
+  document.getElementById("service-selector")?.classList.remove("open");
 }
 
 function selectService(val) {
@@ -186,66 +209,70 @@ function selectService(val) {
   updateServiceBadge();
   saveToStorage();
   // Update active classes without full re-render
-  document.querySelectorAll('.svc-option').forEach(el => {
-    const onclick = el.getAttribute('onclick') || '';
-    el.classList.toggle('active', onclick.includes(`'${val}'`));
+  document.querySelectorAll(".svc-option").forEach((el) => {
+    const onclick = el.getAttribute("onclick") || "";
+    el.classList.toggle("active", onclick.includes(`'${val}'`));
   });
   closeServiceDropdown();
-  const label = val === 'auto' ? 'Auto' : (SERVICE_META[val]?.label || capitalize(val));
-  toast(`Servicio: ${label}`, 'info');
+  const label =
+    val === "auto" ? "Auto" : SERVICE_META[val]?.label || capitalize(val);
+  toast(`Servicio: ${label}`, "info");
 }
 
 function updateInputState() {
   const hasKeys = hasAnyApiKey();
-  const input = document.getElementById('msg-input');
-  const btnSend = document.getElementById('btn-send');
-  const noKeysBanner = document.getElementById('no-keys-banner');
+  const input = document.getElementById("msg-input");
+  const btnSend = document.getElementById("btn-send");
+  const noKeysBanner = document.getElementById("no-keys-banner");
 
   if (input) input.disabled = !hasKeys && !state.streaming;
   if (btnSend) btnSend.disabled = !hasKeys;
-  if (noKeysBanner) noKeysBanner.style.display = hasKeys ? 'none' : 'flex';
+  if (noKeysBanner) noKeysBanner.style.display = hasKeys ? "none" : "flex";
 }
 
 // Settings Panel
 function openSettings() {
-  const panel = document.getElementById('settings-panel');
+  const panel = document.getElementById("settings-panel");
   if (!panel) return;
-  panel.classList.add('open');
+  panel.classList.add("open");
   populateSettingsForm();
 }
 
 function closeSettings() {
-  document.getElementById('settings-panel')?.classList.remove('open');
+  document.getElementById("settings-panel")?.classList.remove("open");
 }
 
 function populateSettingsForm() {
-  ['groq', 'cerebras', 'openrouter'].forEach(svc => {
+  ["groq", "cerebras", "openrouter"].forEach((svc) => {
     const keyEl = document.getElementById(`key-${svc}`);
     const modelEl = document.getElementById(`model-${svc}`);
-    if (keyEl) keyEl.value = state.apiKeys[svc]?.key || '';
-    if (modelEl) modelEl.value = state.apiKeys[svc]?.model || DEFAULT_MODELS[svc];
+    if (keyEl) keyEl.value = state.apiKeys[svc]?.key || "";
+    if (modelEl)
+      modelEl.value = state.apiKeys[svc]?.model || DEFAULT_MODELS[svc];
   });
   updateKeyStatuses();
 }
 
 function updateKeyStatuses() {
-  ['groq', 'cerebras', 'openrouter'].forEach(svc => {
+  ["groq", "cerebras", "openrouter"].forEach((svc) => {
     const indicator = document.getElementById(`status-${svc}`);
     if (indicator) {
-      const hasKey = !!(state.apiKeys[svc]?.key?.trim());
-      indicator.className = 'key-status-dot ' + (hasKey ? 'active' : 'inactive');
-      indicator.title = hasKey ? 'API key configured' : 'No API key';
+      const hasKey = !!state.apiKeys[svc]?.key?.trim();
+      indicator.className =
+        "key-status-dot " + (hasKey ? "active" : "inactive");
+      indicator.title = hasKey ? "API key configured" : "No API key";
     }
   });
 }
 
 function saveSettings() {
-  ['groq', 'cerebras', 'openrouter'].forEach(svc => {
+  ["groq", "cerebras", "openrouter"].forEach((svc) => {
     const keyEl = document.getElementById(`key-${svc}`);
     const modelEl = document.getElementById(`model-${svc}`);
     if (keyEl) state.apiKeys[svc].key = keyEl.value.trim();
-    if (modelEl) state.apiKeys[svc].model = modelEl.value.trim() || DEFAULT_MODELS[svc];
-    state.apiKeys[svc].enabled = !!(state.apiKeys[svc].key);
+    if (modelEl)
+      state.apiKeys[svc].model = modelEl.value.trim() || DEFAULT_MODELS[svc];
+    state.apiKeys[svc].enabled = !!state.apiKeys[svc].key;
   });
   saveToStorage();
   loadServices();
@@ -253,27 +280,27 @@ function saveSettings() {
   updateInputState();
   updateSidebarKeysIndicator();
   closeSettings();
-  toast('Configuración guardada ✓', 'success');
+  toast("Configuración guardada ✓", "success");
 }
 
 function clearKey(svc) {
   const keyEl = document.getElementById(`key-${svc}`);
-  if (keyEl) keyEl.value = '';
-  state.apiKeys[svc].key = '';
+  if (keyEl) keyEl.value = "";
+  state.apiKeys[svc].key = "";
   state.apiKeys[svc].enabled = false;
   saveToStorage();
   updateKeyStatuses();
   updateInputState();
   loadServices();
-  toast(`Clave ${capitalize(svc)} eliminada`, 'info');
+  toast(`Clave ${capitalize(svc)} eliminada`, "info");
 }
 
 function toggleKeyVisibility(svc) {
   const input = document.getElementById(`key-${svc}`);
   const btn = document.getElementById(`toggle-${svc}`);
   if (!input || !btn) return;
-  const isPassword = input.type === 'password';
-  input.type = isPassword ? 'text' : 'password';
+  const isPassword = input.type === "password";
+  input.type = isPassword ? "text" : "password";
   btn.innerHTML = isPassword
     ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`
     : `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
@@ -288,36 +315,41 @@ async function loadModelsForService(svc) {
   const keyEl = document.getElementById(`key-${svc}`);
   const tempKey = keyEl?.value?.trim();
   if (!tempKey && !state.apiKeys[svc]?.key) {
-    toast('Introduce una API key primero', 'error'); return;
+    toast("Introduce una API key primero", "error");
+    return;
   }
 
   const tempHeaders = { ...getApiHeaders() };
   if (tempKey) {
-    if (svc === 'groq') tempHeaders['X-Groq-Key'] = tempKey;
-    if (svc === 'cerebras') tempHeaders['X-Cerebras-Key'] = tempKey;
-    if (svc === 'openrouter') tempHeaders['X-Openrouter-Key'] = tempKey;
+    if (svc === "groq") tempHeaders["X-Groq-Key"] = tempKey;
+    if (svc === "cerebras") tempHeaders["X-Cerebras-Key"] = tempKey;
+    if (svc === "openrouter") tempHeaders["X-Openrouter-Key"] = tempKey;
   }
 
   loadBtn.disabled = true;
-  loadBtn.textContent = '...';
+  loadBtn.textContent = "...";
   try {
-    const res = await fetch(`${API}/models?service=${svc}`, { headers: tempHeaders });
+    const res = await fetch(`${API}/models?service=${svc}`, {
+      headers: tempHeaders,
+    });
     const data = await res.json();
     if (data.models && data.models.length > 0) {
-      modelEl.innerHTML = '';
-      data.models.forEach(m => {
-        const opt = document.createElement('option');
-        opt.value = m; opt.textContent = m;
-        if (m === (state.apiKeys[svc]?.model || DEFAULT_MODELS[svc])) opt.selected = true;
+      modelEl.innerHTML = "";
+      data.models.forEach((m) => {
+        const opt = document.createElement("option");
+        opt.value = m;
+        opt.textContent = m;
+        if (m === (state.apiKeys[svc]?.model || DEFAULT_MODELS[svc]))
+          opt.selected = true;
         modelEl.appendChild(opt);
       });
-      toast(`${data.models.length} modelos cargados`, 'success');
+      toast(`${data.models.length} modelos cargados`, "success");
     }
-  } catch(e) {
-    toast('Error cargando modelos', 'error');
+  } catch (e) {
+    toast("Error cargando modelos", "error");
   } finally {
     loadBtn.disabled = false;
-    loadBtn.textContent = 'Cargar';
+    loadBtn.textContent = "Cargar";
   }
 }
 
@@ -325,11 +357,13 @@ async function loadModelsForService(svc) {
 //  SERVICES
 // ═══════════════════════════════════════════════════════
 // Legacy alias (kept for safety)
-function onServiceChange(val) { selectService(val); }
+function onServiceChange(val) {
+  selectService(val);
+}
 
 function updateServiceBadge() {
-  const badge = document.getElementById('current-service-badge');
-  const label = document.getElementById('service-label');
+  const badge = document.getElementById("current-service-badge");
+  const label = document.getElementById("service-label");
   const val = state.selectedService;
   if (badge) badge.textContent = val.toUpperCase();
   if (label) {
@@ -342,20 +376,24 @@ function updateServiceBadge() {
 //  CONVERSATIONS
 // ═══════════════════════════════════════════════════════
 function newConversation() {
-  const id = 'conv_' + Date.now();
+  const id = "conv_" + Date.now();
   state.conversations[id] = {
-    id, title: 'Nueva conversación',
-    messages: [], systemPrompt: '',
-    createdAt: Date.now(), usedService: null, pinned: false,
+    id,
+    title: "Nueva conversación",
+    messages: [],
+    systemPrompt: "",
+    createdAt: Date.now(),
+    usedService: null,
+    pinned: false,
   };
   state.currentId = id;
   state.pendingFiles = [];
   saveToStorage();
   renderConversationList();
   renderMessages();
-  const titleEl = document.getElementById('chat-title-header');
-  if (titleEl) titleEl.textContent = 'Nueva conversación';
-  const input = document.getElementById('msg-input');
+  const titleEl = document.getElementById("chat-title-header");
+  if (titleEl) titleEl.textContent = "Nueva conversación";
+  const input = document.getElementById("msg-input");
   if (input) input.focus();
   if (window.innerWidth <= 768) closeMobileSidebar();
 }
@@ -369,22 +407,23 @@ function switchConversation(id) {
   renderConversationList();
   renderMessages();
   const conv = state.conversations[id];
-  const titleEl = document.getElementById('chat-title-header');
-  if (titleEl) titleEl.textContent = conv?.title || 'Conversación';
-  const sysEl = document.getElementById('system-prompt-input');
-  if (sysEl) sysEl.value = conv?.systemPrompt || '';
-  const input = document.getElementById('msg-input');
+  const titleEl = document.getElementById("chat-title-header");
+  if (titleEl) titleEl.textContent = conv?.title || "Conversación";
+  const sysEl = document.getElementById("system-prompt-input");
+  if (sysEl) sysEl.value = conv?.systemPrompt || "";
+  const input = document.getElementById("msg-input");
   if (input) input.focus();
   if (window.innerWidth <= 768) closeMobileSidebar();
 }
 
 function deleteConversation(id, e) {
   e.stopPropagation();
-  if (!confirm('¿Eliminar esta conversación?')) return;
+  if (!confirm("¿Eliminar esta conversación?")) return;
   delete state.conversations[id];
   if (state.currentId === id) {
     const remaining = Object.keys(state.conversations);
-    if (remaining.length > 0) switchConversation(remaining[remaining.length - 1]);
+    if (remaining.length > 0)
+      switchConversation(remaining[remaining.length - 1]);
     else newConversation();
   }
   saveToStorage();
@@ -394,16 +433,20 @@ function deleteConversation(id, e) {
 function pinConversation(id, e) {
   e.stopPropagation();
   const conv = state.conversations[id];
-  if (conv) { conv.pinned = !conv.pinned; saveToStorage(); renderConversationList(); }
+  if (conv) {
+    conv.pinned = !conv.pinned;
+    saveToStorage();
+    renderConversationList();
+  }
 }
 
 function clearCurrentConversation() {
   if (!state.currentId) return;
-  if (!confirm('¿Limpiar todos los mensajes de esta conversación?')) return;
+  if (!confirm("¿Limpiar todos los mensajes de esta conversación?")) return;
   state.conversations[state.currentId].messages = [];
   saveToStorage();
   renderMessages();
-  toast('Conversación limpiada', 'info');
+  toast("Conversación limpiada", "info");
 }
 
 function getCurrentConv() {
@@ -413,12 +456,14 @@ function getCurrentConv() {
 function updateConvTitle(id, messages) {
   const conv = state.conversations[id];
   if (!conv) return;
-  if (messages.length > 0 && conv.title === 'Nueva conversación') {
-    const firstUser = messages.find(m => m.role === 'user');
+  if (messages.length > 0 && conv.title === "Nueva conversación") {
+    const firstUser = messages.find((m) => m.role === "user");
     if (firstUser) {
-      const raw = firstUser.displayText || firstUser.rawText || firstUser.content;
-      conv.title = raw.slice(0, 48).replace(/\n/g, ' ') + (raw.length > 48 ? '…' : '');
-      const titleEl = document.getElementById('chat-title-header');
+      const raw =
+        firstUser.displayText || firstUser.rawText || firstUser.content;
+      conv.title =
+        raw.slice(0, 48).replace(/\n/g, " ") + (raw.length > 48 ? "…" : "");
+      const titleEl = document.getElementById("chat-title-header");
       if (titleEl) titleEl.textContent = conv.title;
     }
   }
@@ -427,17 +472,17 @@ function updateConvTitle(id, messages) {
 // ── Search ────────────────────────────────────────────
 function onSearchInput(val) {
   state.searchQuery = val.toLowerCase();
-  const clearBtn = document.getElementById('search-clear-btn');
-  if (clearBtn) clearBtn.style.display = val ? 'block' : 'none';
+  const clearBtn = document.getElementById("search-clear-btn");
+  if (clearBtn) clearBtn.style.display = val ? "block" : "none";
   renderConversationList();
 }
 
 function clearSearch() {
-  state.searchQuery = '';
-  const searchEl = document.getElementById('conv-search');
-  if (searchEl) searchEl.value = '';
-  const clearBtn = document.getElementById('search-clear-btn');
-  if (clearBtn) clearBtn.style.display = 'none';
+  state.searchQuery = "";
+  const searchEl = document.getElementById("conv-search");
+  if (searchEl) searchEl.value = "";
+  const clearBtn = document.getElementById("search-clear-btn");
+  if (clearBtn) clearBtn.style.display = "none";
   renderConversationList();
 }
 
@@ -446,11 +491,11 @@ function clearSearch() {
 // ═══════════════════════════════════════════════════════
 function getMsgText(m) {
   // Unified getter for the readable text of any message
-  return (m.displayText || m.rawText || m.content || '').trim();
+  return (m.displayText || m.rawText || m.content || "").trim();
 }
 
 function renderConversationList() {
-  const list = document.getElementById('conversations-list');
+  const list = document.getElementById("conversations-list");
   if (!list) return;
 
   let convs = Object.values(state.conversations).sort((a, b) => {
@@ -461,9 +506,10 @@ function renderConversationList() {
 
   const q = state.searchQuery.trim();
   if (q) {
-    convs = convs.filter(c =>
-      c.title.toLowerCase().includes(q) ||
-      c.messages.some(m => getMsgText(m).toLowerCase().includes(q))
+    convs = convs.filter(
+      (c) =>
+        c.title.toLowerCase().includes(q) ||
+        c.messages.some((m) => getMsgText(m).toLowerCase().includes(q)),
     );
   }
 
@@ -474,41 +520,47 @@ function renderConversationList() {
     return;
   }
 
-  list.innerHTML = convs.map(c => {
-    // For preview: find last non-system message and extract clean text
-    const lastMsg = c.messages.filter(m => m.role !== 'system').slice(-1)[0];
-    const preview = lastMsg ? getMsgText(lastMsg).slice(0, 60).replace(/\n/g, ' ') || 'Sin mensajes' : 'Sin mensajes';
-    const time = c.messages.length > 0 ? formatRelativeTime(c.createdAt) : '';
-    return `
-    <div class="conv-item ${c.id === state.currentId ? 'active' : ''}" onclick="switchConversation('${c.id}')">
+  list.innerHTML = convs
+    .map((c) => {
+      // For preview: find last non-system message and extract clean text
+      const lastMsg = c.messages
+        .filter((m) => m.role !== "system")
+        .slice(-1)[0];
+      const preview = lastMsg
+        ? getMsgText(lastMsg).slice(0, 60).replace(/\n/g, " ") || "Sin mensajes"
+        : "Sin mensajes";
+      const time = c.messages.length > 0 ? formatRelativeTime(c.createdAt) : "";
+      return `
+    <div class="conv-item ${c.id === state.currentId ? "active" : ""}" onclick="switchConversation('${c.id}')">
       <div class="conv-icon">${getConvIcon(c)}</div>
       <div class="conv-meta">
         <div class="conv-title-row">
           <span class="conv-title">${escHtml(c.title)}</span>
-          ${time ? `<span class="conv-time">${time}</span>` : ''}
+          ${time ? `<span class="conv-time">${time}</span>` : ""}
         </div>
         <div class="conv-preview">${escHtml(preview)}</div>
       </div>
       <div class="conv-actions">
-        <button class="conv-action-btn pin ${c.pinned ? 'pinned' : ''}" onclick="pinConversation('${c.id}', event)" title="${c.pinned ? 'Desanclar' : 'Anclar'}">
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="${c.pinned ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 00-1.11-1.79l-1.78-.9A2 2 0 0115 10.76V6h1a2 2 0 000-4H8a2 2 0 000 4h1v4.76a2 2 0 01-1.11 1.79l-1.78.9A2 2 0 005 15.24V17z"/></svg>
+        <button class="conv-action-btn pin ${c.pinned ? "pinned" : ""}" onclick="pinConversation('${c.id}', event)" title="${c.pinned ? "Desanclar" : "Anclar"}">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="${c.pinned ? "currentColor" : "none"}" stroke="currentColor" stroke-width="2"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 00-1.11-1.79l-1.78-.9A2 2 0 0115 10.76V6h1a2 2 0 000-4H8a2 2 0 000 4h1v4.76a2 2 0 01-1.11 1.79l-1.78.9A2 2 0 005 15.24V17z"/></svg>
         </button>
         <button class="conv-action-btn del" onclick="deleteConversation('${c.id}', event)" title="Eliminar">
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
         </button>
       </div>
     </div>`;
-  }).join('');
+    })
+    .join("");
 }
 
 function getConvIcon(conv) {
-  if (conv.pinned) return '📌';
-  if (conv.messages.length === 0) return '💬';
+  if (conv.pinned) return "📌";
+  if (conv.messages.length === 0) return "💬";
   const svc = conv.usedService;
-  if (svc === 'Groq') return '⚡';
-  if (svc === 'Cerebras') return '🧠';
-  if (svc === 'OpenRouter') return '🌐';
-  return '💬';
+  if (svc === "Groq") return "⚡";
+  if (svc === "Cerebras") return "🧠";
+  if (svc === "OpenRouter") return "🌐";
+  return "💬";
 }
 
 function formatRelativeTime(ts) {
@@ -516,18 +568,21 @@ function formatRelativeTime(ts) {
   const m = Math.floor(diff / 60000);
   const h = Math.floor(diff / 3600000);
   const d = Math.floor(diff / 86400000);
-  if (m < 1) return 'ahora';
+  if (m < 1) return "ahora";
   if (m < 60) return `${m}m`;
   if (h < 24) return `${h}h`;
   if (d < 7) return `${d}d`;
-  return new Date(ts).toLocaleDateString('es', { day: 'numeric', month: 'short' });
+  return new Date(ts).toLocaleDateString("es", {
+    day: "numeric",
+    month: "short",
+  });
 }
 
 // ═══════════════════════════════════════════════════════
 //  RENDER MESSAGES
 // ═══════════════════════════════════════════════════════
 function renderMessages() {
-  const inner = document.getElementById('messages-inner');
+  const inner = document.getElementById("messages-inner");
   if (!inner) return;
   const conv = getCurrentConv();
 
@@ -548,26 +603,30 @@ function renderMessages() {
     return;
   }
 
-  inner.innerHTML = conv.messages.map((msg, idx) => renderMessageRow(msg, idx)).join('');
+  inner.innerHTML = conv.messages
+    .map((msg, idx) => renderMessageRow(msg, idx))
+    .join("");
   applyHighlighting();
   scrollToBottom(false);
 }
 
 function renderMessageRow(msg, idx) {
-  const isUser = msg.role === 'user';
+  const isUser = msg.role === "user";
   const displayContent = isUser
-    ? escHtml(msg.displayText ?? msg.content).replace(/\n/g, '<br>')
+    ? escHtml(msg.displayText ?? msg.content).replace(/\n/g, "<br>")
     : renderMarkdown(msg.content);
-  const filesHtml = (msg.files && msg.files.length > 0)
-    ? `<div class="msg-files">${msg.files.map(f => renderFileChip(f)).join('')}</div>`
-    : '';
+  const filesHtml =
+    msg.files && msg.files.length > 0
+      ? `<div class="msg-files">${msg.files.map((f) => renderFileChip(f)).join("")}</div>`
+      : "";
 
-  const svcTag = (!isUser && msg.service)
-    ? `<span class="svc-tag">${msg.service}${msg.model ? ` · ${shortenModel(msg.model)}` : ''}</span>`
-    : '';
+  const svcTag =
+    !isUser && msg.service
+      ? `<span class="svc-tag">${msg.service}${msg.model ? ` · ${shortenModel(msg.model)}` : ""}</span>`
+      : "";
 
-  const timeStr = msg.timestamp ? formatTime(msg.timestamp) : '';
-  const timeTag = timeStr ? `<span class="msg-time">${timeStr}</span>` : '';
+  const timeStr = msg.timestamp ? formatTime(msg.timestamp) : "";
+  const timeTag = timeStr ? `<span class="msg-time">${timeStr}</span>` : "";
 
   return `<div class="msg-row ${msg.role}" data-idx="${idx}">
     <div class="msg-label">
@@ -583,12 +642,13 @@ function renderMessageRow(msg, idx) {
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
         Copiar
       </button>
-      ${isUser
-        ? `<button class="msg-action-btn" onclick="editMessage(${idx})" title="Editar">
+      ${
+        isUser
+          ? `<button class="msg-action-btn" onclick="editMessage(${idx})" title="Editar">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
             Editar
           </button>`
-        : `<button class="msg-action-btn" onclick="regenerateFrom(${idx})" title="Regenerar">
+          : `<button class="msg-action-btn" onclick="regenerateFrom(${idx})" title="Regenerar">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
             Regenerar
           </button>`
@@ -598,42 +658,47 @@ function renderMessageRow(msg, idx) {
 }
 
 function shortenModel(model) {
-  if (!model) return '';
+  if (!model) return "";
   // Shorten long model names
-  return model.split('/').pop()?.split(':')[0]?.slice(0, 24) || model;
+  return model.split("/").pop()?.split(":")[0]?.slice(0, 24) || model;
 }
 
 function formatTime(ts) {
-  if (!ts) return '';
-  return new Date(ts).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
+  if (!ts) return "";
+  return new Date(ts).toLocaleTimeString("es", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 function addMessageToDOM(msg, idx) {
-  const welcome = document.getElementById('welcome');
+  const welcome = document.getElementById("welcome");
   if (welcome) welcome.remove();
-  const inner = document.getElementById('messages-inner');
-  const div = document.createElement('div');
+  const inner = document.getElementById("messages-inner");
+  const div = document.createElement("div");
   div.innerHTML = renderMessageRow(msg, idx);
   const el = div.firstElementChild;
-  el.style.opacity = '0';
-  el.style.transform = 'translateY(8px)';
+  el.style.opacity = "0";
+  el.style.transform = "translateY(8px)";
   inner.appendChild(el);
   requestAnimationFrame(() => {
-    el.style.transition = 'opacity 0.25s ease, transform 0.25s ease';
-    el.style.opacity = '1';
-    el.style.transform = 'translateY(0)';
+    el.style.transition = "opacity 0.25s ease, transform 0.25s ease";
+    el.style.opacity = "1";
+    el.style.transform = "translateY(0)";
   });
   applyHighlighting();
   scrollToBottom();
 }
 
 function renderMarkdown(text) {
-  if (!text) return '';
+  if (!text) return "";
   try {
     const html = marked.parse(text, { breaks: true, gfm: true });
     return html
-      .replace(/<pre><code class="language-([^"]+)">([\s\S]*?)<\/code><\/pre>/g, (_, lang, code) => {
-        return `<div class="code-block-wrapper">
+      .replace(
+        /<pre><code class="language-([^"]+)">([\s\S]*?)<\/code><\/pre>/g,
+        (_, lang, code) => {
+          return `<div class="code-block-wrapper">
           <div class="code-block-header">
             <span class="code-lang">${escHtml(lang)}</span>
             <button class="btn-copy-code" onclick="copyCodeBlock(this)">
@@ -643,7 +708,8 @@ function renderMarkdown(text) {
           </div>
           <pre><code class="language-${escHtml(lang)}">${code}</code></pre>
         </div>`;
-      })
+        },
+      )
       .replace(/<pre><code>([\s\S]*?)<\/code><\/pre>/g, (_, code) => {
         return `<div class="code-block-wrapper">
           <div class="code-block-header">
@@ -656,20 +722,24 @@ function renderMarkdown(text) {
           <pre><code>${code}</code></pre>
         </div>`;
       });
-  } catch(e) { return escHtml(text); }
+  } catch (e) {
+    return escHtml(text);
+  }
 }
 
 function applyHighlighting() {
-  document.querySelectorAll('.code-block-wrapper pre code:not([data-highlighted])').forEach(block => {
-    hljs.highlightElement(block);
-    block.dataset.highlighted = 'yes';
-  });
+  document
+    .querySelectorAll(".code-block-wrapper pre code:not([data-highlighted])")
+    .forEach((block) => {
+      hljs.highlightElement(block);
+      block.dataset.highlighted = "yes";
+    });
 }
 
 function scrollToBottom(smooth = true) {
-  const c = document.getElementById('messages-container');
+  const c = document.getElementById("messages-container");
   if (!c) return;
-  c.scrollTo({ top: c.scrollHeight, behavior: smooth ? 'smooth' : 'instant' });
+  c.scrollTo({ top: c.scrollHeight, behavior: smooth ? "smooth" : "instant" });
 }
 
 // ═══════════════════════════════════════════════════════
@@ -677,11 +747,11 @@ function scrollToBottom(smooth = true) {
 // ═══════════════════════════════════════════════════════
 async function sendMessage() {
   if (!hasAnyApiKey()) {
-    toast('Configura tus API keys primero', 'error');
+    toast("Configura tus API keys primero", "error");
     openSettings();
     return;
   }
-  const input = document.getElementById('msg-input');
+  const input = document.getElementById("msg-input");
   const text = input.value.trim();
   if (!text && state.pendingFiles.length === 0) return;
   if (state.streaming) return;
@@ -690,18 +760,21 @@ async function sendMessage() {
   if (!conv) return;
 
   const userMsg = {
-    role: 'user',
+    role: "user",
     content: text,
     displayText: text,
     rawText: text,
     timestamp: Date.now(),
-    files: state.pendingFiles.map(f => ({
+    files: state.pendingFiles.map((f) => ({
       name: f.name,
       mimeType: f.mimeType,
       size: f.size,
       displayType: f.displayType,
-      preview: f.displayType === 'image' ? f.content : null,
-      fileContent: f.displayType === 'text' ? truncateFileContent(f.content, f.name) : null,
+      preview: f.displayType === "image" ? f.content : null,
+      fileContent:
+        f.displayType === "text"
+          ? truncateFileContent(f.content, f.name)
+          : null,
     })),
   };
 
@@ -710,7 +783,7 @@ async function sendMessage() {
   saveToStorage();
   addMessageToDOM(userMsg, conv.messages.length - 1);
 
-  input.value = '';
+  input.value = "";
   autoResize(input);
   clearFilePreviews();
   input.focus();
@@ -721,24 +794,28 @@ async function sendMessage() {
 const MAX_FILE_CHARS = 8000;
 
 function truncateFileContent(text, filename) {
-  if (!text) return '';
+  if (!text) return "";
   if (text.length <= MAX_FILE_CHARS) return text;
   const half = Math.floor(MAX_FILE_CHARS / 2);
-  return text.slice(0, half)
-    + `\n\n[... contenido truncado — ${text.length.toLocaleString()} caracteres totales ...]\n\n`
-    + text.slice(-half);
+  return (
+    text.slice(0, half) +
+    `\n\n[... contenido truncado — ${text.length.toLocaleString()} caracteres totales ...]\n\n` +
+    text.slice(-half)
+  );
 }
 
 function buildApiContent(msg) {
   const files = msg.files ?? [];
   if (files.length === 0) return msg.content;
-  let extra = '';
-  files.forEach(f => {
-    if (f.displayType === 'image') extra += `[Imagen adjunta: ${f.name}]\n`;
-    else if (f.fileContent) extra += `\n--- Archivo: ${f.name} ---\n${f.fileContent}\n---\n`;
-    else if (f.displayType === 'binary') extra += `[Archivo binario adjunto: ${f.name} (${f.mimeType})]\n`;
+  let extra = "";
+  files.forEach((f) => {
+    if (f.displayType === "image") extra += `[Imagen adjunta: ${f.name}]\n`;
+    else if (f.fileContent)
+      extra += `\n--- Archivo: ${f.name} ---\n${f.fileContent}\n---\n`;
+    else if (f.displayType === "binary")
+      extra += `[Archivo binario adjunto: ${f.name} (${f.mimeType})]\n`;
   });
-  return (msg.content ? msg.content + '\n\n' : '') + extra.trim();
+  return (msg.content ? msg.content + "\n\n" : "") + extra.trim();
 }
 
 // ═══════════════════════════════════════════════════════
@@ -748,66 +825,78 @@ async function streamResponse(conv, retryCount = 0) {
   setStreaming(true);
 
   const apiMessages = [];
-  if (conv.systemPrompt) apiMessages.push({ role: 'system', content: conv.systemPrompt });
-  conv.messages.forEach(m => {
+  if (conv.systemPrompt)
+    apiMessages.push({ role: "system", content: conv.systemPrompt });
+  conv.messages.forEach((m) => {
     apiMessages.push({ role: m.role, content: buildApiContent(m) });
   });
 
   const typingId = addTypingIndicator();
-  let fullContent = '';
-  let usedService = '';
-  let usedModel = '';
+  let fullContent = "";
+  let usedService = "";
+  let usedModel = "";
 
   try {
     state.abortController = new AbortController();
     const res = await fetch(`${API}/chat`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
         ...getApiHeaders(),
       },
       body: JSON.stringify({
         messages: apiMessages,
-        service: state.selectedService === 'auto' ? undefined : state.selectedService,
+        service:
+          state.selectedService === "auto" ? undefined : state.selectedService,
       }),
       signal: state.abortController.signal,
     });
 
     if (!res.ok) {
-      const errData = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+      const errData = await res
+        .json()
+        .catch(() => ({ error: `HTTP ${res.status}` }));
       throw new Error(errData.error || `HTTP ${res.status}`);
     }
 
     removeTypingIndicator(typingId);
 
-    const assistantMsg = { role: 'assistant', content: '', service: '', model: '', timestamp: Date.now() };
+    const assistantMsg = {
+      role: "assistant",
+      content: "",
+      service: "",
+      model: "",
+      timestamp: Date.now(),
+    };
     conv.messages.push(assistantMsg);
     const msgIdx = conv.messages.length - 1;
     addMessageToDOM(assistantMsg, msgIdx);
-    const bubble = document.querySelector(`.msg-row[data-idx="${msgIdx}"] .msg-content`);
-    if (bubble) bubble.classList.add('streaming-cursor');
+    const bubble = document.querySelector(
+      `.msg-row[data-idx="${msgIdx}"] .msg-content`,
+    );
+    if (bubble) bubble.classList.add("streaming-cursor");
 
     const reader = res.body.getReader();
     const dec = new TextDecoder();
-    let buffer = '';
+    let buffer = "";
     let tokenCount = 0;
 
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
       buffer += dec.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
 
       for (const line of lines) {
-        if (!line.startsWith('data: ')) continue;
+        if (!line.startsWith("data: ")) continue;
         const data = line.slice(6).trim();
-        if (data === '[DONE]') break;
+        if (data === "[DONE]") break;
         try {
           const parsed = JSON.parse(data);
           if (parsed.service) {
             usedService = parsed.service;
-            usedModel = parsed.model || '';
+            usedModel = parsed.model || "";
             conv.usedService = usedService;
           }
           if (parsed.content) {
@@ -823,8 +912,8 @@ async function streamResponse(conv, retryCount = 0) {
             scrollToBottom(false);
           }
           if (parsed.error) throw new Error(parsed.error);
-        } catch(e) {
-          if (e.message && !e.message.includes('JSON')) throw e;
+        } catch (e) {
+          if (e.message && !e.message.includes("JSON")) throw e;
         }
       }
     }
@@ -835,38 +924,40 @@ async function streamResponse(conv, retryCount = 0) {
     assistantMsg.model = usedModel;
 
     if (bubble) {
-      bubble.classList.remove('streaming-cursor');
+      bubble.classList.remove("streaming-cursor");
       bubble.innerHTML = renderMarkdown(fullContent);
       applyHighlighting();
     }
 
-    const label = document.querySelector(`.msg-row[data-idx="${msgIdx}"] .msg-label`);
+    const label = document.querySelector(
+      `.msg-row[data-idx="${msgIdx}"] .msg-label`,
+    );
     if (label && usedService) {
-      const modelShort = usedModel ? ` · ${shortenModel(usedModel)}` : '';
+      const modelShort = usedModel ? ` · ${shortenModel(usedModel)}` : "";
       label.innerHTML = `<span class="msg-author">Asistente</span> <span class="svc-tag">${usedService}${modelShort}</span>`;
     }
 
     saveToStorage();
     renderConversationList();
     triggerNotification(usedService);
-
-  } catch(err) {
+  } catch (err) {
     removeTypingIndicator(typingId);
-    if (err.name === 'AbortError') {
-      toast('Respuesta cancelada', 'info');
+    if (err.name === "AbortError") {
+      toast("Respuesta cancelada", "info");
       const lastMsg = conv.messages[conv.messages.length - 1];
-      if (lastMsg?.role === 'assistant' && !lastMsg.content) conv.messages.pop();
-    } else if (retryCount < 1 && err.message?.includes('fetch')) {
+      if (lastMsg?.role === "assistant" && !lastMsg.content)
+        conv.messages.pop();
+    } else if (retryCount < 1 && err.message?.includes("fetch")) {
       // Auto-retry once on network error
-      toast('Reintentando conexión...', 'info');
+      toast("Reintentando conexión...", "info");
       setStreaming(false);
-      await new Promise(r => setTimeout(r, 1500));
+      await new Promise((r) => setTimeout(r, 1500));
       return streamResponse(conv, retryCount + 1);
     } else {
-      const msg = err.message || 'Error desconocido';
-      toast('Error: ' + msg, 'error');
+      const msg = err.message || "Error desconocido";
+      toast("Error: " + msg, "error");
       const lastMsg = conv.messages[conv.messages.length - 1];
-      if (lastMsg?.role === 'assistant') conv.messages.pop();
+      if (lastMsg?.role === "assistant") conv.messages.pop();
     }
     saveToStorage();
     renderMessages();
@@ -876,11 +967,13 @@ async function streamResponse(conv, retryCount = 0) {
 }
 
 function addTypingIndicator() {
-  const id = 'typing_' + Date.now();
-  const welcome = document.getElementById('welcome');
+  const id = "typing_" + Date.now();
+  const welcome = document.getElementById("welcome");
   if (welcome) welcome.remove();
-  const inner = document.getElementById('messages-inner');
-  inner.insertAdjacentHTML('beforeend', `
+  const inner = document.getElementById("messages-inner");
+  inner.insertAdjacentHTML(
+    "beforeend",
+    `
     <div class="msg-row assistant typing-row" id="${id}">
       <div class="msg-label"><span class="msg-author">Asistente</span></div>
       <div class="msg-bubble">
@@ -891,7 +984,8 @@ function addTypingIndicator() {
         </div>
       </div>
     </div>
-  `);
+  `,
+  );
   scrollToBottom();
   return id;
 }
@@ -902,11 +996,11 @@ function removeTypingIndicator(id) {
 
 function setStreaming(val) {
   state.streaming = val;
-  const btnSend = document.getElementById('btn-send');
-  const btnStop = document.getElementById('btn-stop');
-  const input = document.getElementById('msg-input');
-  if (btnSend) btnSend.style.display = val ? 'none' : 'flex';
-  if (btnStop) btnStop.style.display = val ? 'flex' : 'none';
+  const btnSend = document.getElementById("btn-send");
+  const btnStop = document.getElementById("btn-stop");
+  const input = document.getElementById("msg-input");
+  if (btnSend) btnSend.style.display = val ? "none" : "flex";
+  if (btnStop) btnStop.style.display = val ? "flex" : "none";
   if (input) {
     input.disabled = val || !hasAnyApiKey();
     if (!val && hasAnyApiKey()) input.focus();
@@ -925,17 +1019,19 @@ function copyMessage(idx) {
   if (!conv) return;
   const msg = conv.messages[idx];
   if (!msg) return;
-  navigator.clipboard.writeText(msg.content).then(() => toast('Copiado ✓', 'success'));
+  navigator.clipboard
+    .writeText(msg.content)
+    .then(() => toast("Copiado ✓", "success"));
 }
 
 function editMessage(idx) {
   const conv = getCurrentConv();
   if (!conv || state.streaming) return;
   const msg = conv.messages[idx];
-  if (!msg || msg.role !== 'user') return;
+  if (!msg || msg.role !== "user") return;
   const row = document.querySelector(`.msg-row[data-idx="${idx}"]`);
   if (!row) return;
-  const bubble = row.querySelector('.msg-bubble');
+  const bubble = row.querySelector(".msg-bubble");
   const original = msg.rawText || msg.content;
   bubble.innerHTML = `
     <textarea class="msg-edit-area" id="edit_${idx}" rows="3">${escHtml(original)}</textarea>
@@ -945,7 +1041,10 @@ function editMessage(idx) {
     </div>
   `;
   const ta = document.getElementById(`edit_${idx}`);
-  if (ta) { autoResize(ta); ta.focus(); }
+  if (ta) {
+    autoResize(ta);
+    ta.focus();
+  }
 }
 
 function saveEdit(idx) {
@@ -964,7 +1063,9 @@ function saveEdit(idx) {
   streamResponse(conv);
 }
 
-function cancelEdit(idx) { renderMessages(); }
+function cancelEdit(idx) {
+  renderMessages();
+}
 
 function regenerateFrom(idx) {
   const conv = getCurrentConv();
@@ -976,14 +1077,14 @@ function regenerateFrom(idx) {
 }
 
 function copyCodeBlock(btn) {
-  const code = btn.closest('.code-block-wrapper').querySelector('code');
+  const code = btn.closest(".code-block-wrapper").querySelector("code");
   if (!code) return;
   navigator.clipboard.writeText(code.innerText).then(() => {
     const originalHtml = btn.innerHTML;
-    btn.classList.add('copied');
+    btn.classList.add("copied");
     btn.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Copiado`;
     setTimeout(() => {
-      btn.classList.remove('copied');
+      btn.classList.remove("copied");
       btn.innerHTML = originalHtml;
     }, 2000);
   });
@@ -994,16 +1095,19 @@ function copyCodeBlock(btn) {
 // ═══════════════════════════════════════════════════════
 async function handleFileInput(event) {
   const files = Array.from(event.target.files);
-  event.target.value = '';
+  event.target.value = "";
   for (const file of files) await processFile(file);
 }
 
 async function processFile(file) {
   const toastId = toastProgress(`Procesando ${file.name}...`);
   const formData = new FormData();
-  formData.append('file', file);
+  formData.append("file", file);
   try {
-    const res = await fetch(`${API}/upload`, { method: 'POST', body: formData });
+    const res = await fetch(`${API}/upload`, {
+      method: "POST",
+      body: formData,
+    });
     const data = await res.json();
     if (data.error) throw new Error(data.error);
     state.pendingFiles.push({
@@ -1015,33 +1119,35 @@ async function processFile(file) {
     });
     renderFilePreviews();
     removeToast(toastId);
-    toast(`${data.filename} listo ✓`, 'success');
-  } catch(e) {
+    toast(`${data.filename} listo ✓`, "success");
+  } catch (e) {
     removeToast(toastId);
-    toast(`Error: ${e.message}`, 'error');
+    toast(`Error: ${e.message}`, "error");
   }
 }
 
 function renderFilePreviews() {
-  const container = document.getElementById('file-previews');
+  const container = document.getElementById("file-previews");
   if (!container) return;
-  container.innerHTML = state.pendingFiles.map((f, i) => {
-    if (f.displayType === 'image' && f.content) {
-      return `<div class="file-preview-chip img-preview-chip">
+  container.innerHTML = state.pendingFiles
+    .map((f, i) => {
+      if (f.displayType === "image" && f.content) {
+        return `<div class="file-preview-chip img-preview-chip">
         <img class="fp-thumb" src="data:${f.mimeType};base64,${f.content}" alt="${escHtml(f.name)}"/>
         <span class="fp-name-overlay">${escHtml(f.name)}</span>
         <button class="fp-remove" onclick="removeFile(${i})" title="Quitar">✕</button>
       </div>`;
-    }
-    return `<div class="file-preview-chip">
+      }
+      return `<div class="file-preview-chip">
       <span class="fp-icon">${getFileIcon(f.mimeType)}</span>
       <div style="display:flex;flex-direction:column;gap:1px;min-width:0;flex:1">
         <span class="fp-name">${escHtml(f.name)}</span>
-        <span class="fp-type">${getFileLabel(f.mimeType, f.name)}${f.size ? ' · ' + formatFileSize(f.size) : ''}</span>
+        <span class="fp-type">${getFileLabel(f.mimeType, f.name)}${f.size ? " · " + formatFileSize(f.size) : ""}</span>
       </div>
       <button class="fp-remove" onclick="removeFile(${i})" title="Quitar">✕</button>
     </div>`;
-  }).join('');
+    })
+    .join("");
 }
 
 function removeFile(idx) {
@@ -1055,39 +1161,45 @@ function clearFilePreviews() {
 }
 
 function getFileIcon(mimeType) {
-  if (!mimeType) return '📎';
-  if (mimeType.startsWith('image/')) return '🖼️';
-  if (mimeType === 'application/pdf') return '📄';
-  if (mimeType.includes('json')) return '🔧';
-  if (mimeType.includes('csv')) return '📊';
-  if (mimeType.includes('python') || mimeType.includes('javascript') || mimeType.includes('typescript')) return '💻';
-  if (mimeType.startsWith('text/')) return '📝';
-  return '📎';
+  if (!mimeType) return "📎";
+  if (mimeType.startsWith("image/")) return "🖼️";
+  if (mimeType === "application/pdf") return "📄";
+  if (mimeType.includes("json")) return "🔧";
+  if (mimeType.includes("csv")) return "📊";
+  if (
+    mimeType.includes("python") ||
+    mimeType.includes("javascript") ||
+    mimeType.includes("typescript")
+  )
+    return "💻";
+  if (mimeType.startsWith("text/")) return "📝";
+  return "📎";
 }
 
 function getFileLabel(mimeType, filename) {
-  if (!mimeType) return 'Archivo';
-  if (mimeType.startsWith('image/')) return mimeType.split('/')[1].toUpperCase();
-  if (mimeType === 'application/pdf') return 'PDF';
-  if (mimeType.includes('json')) return 'JSON';
-  if (mimeType.includes('csv')) return 'CSV';
-  const ext = filename?.split('.').pop()?.toUpperCase();
+  if (!mimeType) return "Archivo";
+  if (mimeType.startsWith("image/"))
+    return mimeType.split("/")[1].toUpperCase();
+  if (mimeType === "application/pdf") return "PDF";
+  if (mimeType.includes("json")) return "JSON";
+  if (mimeType.includes("csv")) return "CSV";
+  const ext = filename?.split(".").pop()?.toUpperCase();
   if (ext) return ext;
-  if (mimeType.startsWith('text/')) return 'TEXTO';
-  return 'ARCHIVO';
+  if (mimeType.startsWith("text/")) return "TEXTO";
+  return "ARCHIVO";
 }
 
 function formatFileSize(bytes) {
-  if (!bytes) return '';
-  if (bytes < 1024) return bytes + ' B';
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  if (!bytes) return "";
+  if (bytes < 1024) return bytes + " B";
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+  return (bytes / (1024 * 1024)).toFixed(1) + " MB";
 }
 
 function renderFileChip(f) {
   const label = getFileLabel(f.mimeType, f.name);
-  const size = f.size ? formatFileSize(f.size) : '';
-  if (f.displayType === 'image' && f.preview) {
+  const size = f.size ? formatFileSize(f.size) : "";
+  if (f.displayType === "image" && f.preview) {
     return `<div class="msg-file-chip img-chip" onclick="openLightbox('data:${f.mimeType};base64,${f.preview}')" title="Ampliar imagen">
       <img class="fc-thumb" src="data:${f.mimeType};base64,${f.preview}" alt="${escHtml(f.name)}"/>
       <div class="fc-thumb-overlay"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div>
@@ -1097,48 +1209,51 @@ function renderFileChip(f) {
     <span class="fc-icon">${getFileIcon(f.mimeType)}</span>
     <div class="fc-info">
       <div class="fc-name">${escHtml(f.name)}</div>
-      <div class="fc-meta">${label}${size ? ' · ' + size : ''}</div>
+      <div class="fc-meta">${label}${size ? " · " + size : ""}</div>
     </div>
   </div>`;
 }
 
 function openLightbox(src) {
-  let lb = document.getElementById('lightbox');
+  let lb = document.getElementById("lightbox");
   if (!lb) {
-    lb = document.createElement('div');
-    lb.id = 'lightbox';
-    lb.innerHTML = '<div class="lb-overlay"></div><div class="lb-content"><img id="lb-img"/><button class="lb-close" onclick="closeLightbox()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>';
-    lb.querySelector('.lb-overlay').onclick = closeLightbox;
+    lb = document.createElement("div");
+    lb.id = "lightbox";
+    lb.innerHTML =
+      '<div class="lb-overlay"></div><div class="lb-content"><img id="lb-img"/><button class="lb-close" onclick="closeLightbox()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>';
+    lb.querySelector(".lb-overlay").onclick = closeLightbox;
     document.body.appendChild(lb);
   }
-  document.getElementById('lb-img').src = src;
-  lb.classList.add('open');
-  document.addEventListener('keydown', lbKeyHandler);
+  document.getElementById("lb-img").src = src;
+  lb.classList.add("open");
+  document.addEventListener("keydown", lbKeyHandler);
 }
 
 function closeLightbox() {
-  document.getElementById('lightbox')?.classList.remove('open');
-  document.removeEventListener('keydown', lbKeyHandler);
+  document.getElementById("lightbox")?.classList.remove("open");
+  document.removeEventListener("keydown", lbKeyHandler);
 }
 
-function lbKeyHandler(e) { if (e.key === 'Escape') closeLightbox(); }
+function lbKeyHandler(e) {
+  if (e.key === "Escape") closeLightbox();
+}
 
 // ── Drag & Drop ──────────────────────────────────────
 function setupDragDrop() {
   const body = document.body;
-  const wrap = document.getElementById('textarea-wrap');
+  const wrap = document.getElementById("textarea-wrap");
 
-  body.addEventListener('dragover', e => {
+  body.addEventListener("dragover", (e) => {
     e.preventDefault();
-    if (wrap) wrap.classList.add('drag-over');
+    if (wrap) wrap.classList.add("drag-over");
   });
-  body.addEventListener('dragleave', e => {
+  body.addEventListener("dragleave", (e) => {
     if (!e.relatedTarget || !body.contains(e.relatedTarget))
-      if (wrap) wrap.classList.remove('drag-over');
+      if (wrap) wrap.classList.remove("drag-over");
   });
-  body.addEventListener('drop', async e => {
+  body.addEventListener("drop", async (e) => {
     e.preventDefault();
-    if (wrap) wrap.classList.remove('drag-over');
+    if (wrap) wrap.classList.remove("drag-over");
     const files = Array.from(e.dataTransfer.files);
     for (const file of files) await processFile(file);
   });
@@ -1148,50 +1263,59 @@ function setupDragDrop() {
 //  SYSTEM PROMPT
 // ═══════════════════════════════════════════════════════
 function toggleSystemPanel() {
-  const panel = document.getElementById('system-panel');
-  const btn = document.getElementById('btn-system');
+  const panel = document.getElementById("system-panel");
+  const btn = document.getElementById("btn-system");
   if (!panel) return;
-  const isOpen = panel.classList.toggle('open');
-  if (btn) btn.classList.toggle('active', isOpen);
+  const isOpen = panel.classList.toggle("open");
+  if (btn) btn.classList.toggle("active", isOpen);
   if (isOpen) {
     const conv = getCurrentConv();
-    const sysEl = document.getElementById('system-prompt-input');
-    if (sysEl) sysEl.value = conv?.systemPrompt || '';
+    const sysEl = document.getElementById("system-prompt-input");
+    if (sysEl) sysEl.value = conv?.systemPrompt || "";
   }
 }
 
 function saveSystemPrompt() {
   const conv = getCurrentConv();
   if (!conv) return;
-  const sysEl = document.getElementById('system-prompt-input');
-  conv.systemPrompt = sysEl?.value || '';
+  const sysEl = document.getElementById("system-prompt-input");
+  conv.systemPrompt = sysEl?.value || "";
   saveToStorage();
-  toast('System prompt guardado ✓', 'success');
+  toast("System prompt guardado ✓", "success");
 }
 
 function clearSystemPrompt() {
-  const sysEl = document.getElementById('system-prompt-input');
-  if (sysEl) sysEl.value = '';
+  const sysEl = document.getElementById("system-prompt-input");
+  if (sysEl) sysEl.value = "";
   const conv = getCurrentConv();
-  if (conv) { conv.systemPrompt = ''; saveToStorage(); }
-  toast('System prompt limpiado', 'info');
+  if (conv) {
+    conv.systemPrompt = "";
+    saveToStorage();
+  }
+  toast("System prompt limpiado", "info");
 }
 
 const TEMPLATES = {
-  python: 'Eres un experto desarrollador Python. Siempre escribes código limpio, bien documentado con docstrings, siguiendo PEP 8. Explica cada parte del código con claridad.',
-  translator: 'Eres un traductor profesional experto. Traduce con precisión manteniendo el tono, estilo y matices del texto original. Si hay ambigüedad, indica las opciones.',
-  analyst: 'Eres un analista de datos experto. Estructura tu análisis con: 1) Resumen ejecutivo, 2) Hallazgos clave, 3) Visualizaciones sugeridas, 4) Recomendaciones accionables.',
-  writer: 'Eres un escritor creativo con prosa elegante y voz distintiva. Usa metáforas originales, ritmo variado y detalles sensoriales. Evita clichés y frases genéricas.',
-  coder: 'Eres un ingeniero de software senior. Escribe código production-ready, considera edge cases, incluye manejo de errores y tests. Explica las decisiones de diseño.',
-  teacher: 'Eres un profesor experto. Explica conceptos de forma clara usando analogías, ejemplos concretos y progresión lógica. Adapta el nivel de detalle al usuario.',
+  python:
+    "Eres un experto desarrollador Python. Siempre escribes código limpio, bien documentado con docstrings, siguiendo PEP 8. Explica cada parte del código con claridad.",
+  translator:
+    "Eres un traductor profesional experto. Traduce con precisión manteniendo el tono, estilo y matices del texto original. Si hay ambigüedad, indica las opciones.",
+  analyst:
+    "Eres un analista de datos experto. Estructura tu análisis con: 1) Resumen ejecutivo, 2) Hallazgos clave, 3) Visualizaciones sugeridas, 4) Recomendaciones accionables.",
+  writer:
+    "Eres un escritor creativo con prosa elegante y voz distintiva. Usa metáforas originales, ritmo variado y detalles sensoriales. Evita clichés y frases genéricas.",
+  coder:
+    "Eres un ingeniero de software senior. Escribe código production-ready, considera edge cases, incluye manejo de errores y tests. Explica las decisiones de diseño.",
+  teacher:
+    "Eres un profesor experto. Explica conceptos de forma clara usando analogías, ejemplos concretos y progresión lógica. Adapta el nivel de detalle al usuario.",
 };
 
 function applyTemplate(key) {
   const tpl = TEMPLATES[key];
   if (tpl) {
-    const sysEl = document.getElementById('system-prompt-input');
+    const sysEl = document.getElementById("system-prompt-input");
     if (sysEl) sysEl.value = tpl;
-    toast('Plantilla aplicada — guarda para confirmar', 'info');
+    toast("Plantilla aplicada — guarda para confirmar", "info");
   }
 }
 
@@ -1200,75 +1324,105 @@ function applyTemplate(key) {
 // ═══════════════════════════════════════════════════════
 function openExport() {
   const conv = getCurrentConv();
-  if (!conv || conv.messages.length === 0) { toast('No hay mensajes para exportar', 'info'); return; }
-  document.getElementById('export-panel')?.classList.add('open');
+  if (!conv || conv.messages.length === 0) {
+    toast("No hay mensajes para exportar", "info");
+    return;
+  }
+  document.getElementById("export-panel")?.classList.add("open");
 }
-function closeExport() { document.getElementById('export-panel')?.classList.remove('open'); }
+function closeExport() {
+  document.getElementById("export-panel")?.classList.remove("open");
+}
 
 function exportAs(format) {
   const conv = getCurrentConv();
   if (!conv) return;
-  let content = '', ext = '', mime = '';
-  if (format === 'markdown') {
+  let content = "",
+    ext = "",
+    mime = "";
+  if (format === "markdown") {
     content = `# ${conv.title}\n\n_Exportado: ${new Date().toLocaleString()}_\n\n---\n\n`;
-    if (conv.systemPrompt) content += `**System Prompt:** ${conv.systemPrompt}\n\n---\n\n`;
-    conv.messages.forEach(m => {
-      const service = m.service ? ` (${m.service}${m.model ? ` · ${m.model}` : ''})` : '';
-      content += `## ${m.role === 'user' ? '👤 Tú' : `🤖 Asistente${service}`}\n\n${m.content}\n\n---\n\n`;
+    if (conv.systemPrompt)
+      content += `**System Prompt:** ${conv.systemPrompt}\n\n---\n\n`;
+    conv.messages.forEach((m) => {
+      const service = m.service
+        ? ` (${m.service}${m.model ? ` · ${m.model}` : ""})`
+        : "";
+      content += `## ${m.role === "user" ? "👤 Tú" : `🤖 Asistente${service}`}\n\n${m.content}\n\n---\n\n`;
     });
-    ext = 'md'; mime = 'text/markdown';
-  } else if (format === 'json') {
-    content = JSON.stringify({
-      title: conv.title, exportedAt: new Date().toISOString(),
-      systemPrompt: conv.systemPrompt,
-      messages: conv.messages.map(m => ({ role: m.role, content: m.content, service: m.service, model: m.model, timestamp: m.timestamp }))
-    }, null, 2);
-    ext = 'json'; mime = 'application/json';
+    ext = "md";
+    mime = "text/markdown";
+  } else if (format === "json") {
+    content = JSON.stringify(
+      {
+        title: conv.title,
+        exportedAt: new Date().toISOString(),
+        systemPrompt: conv.systemPrompt,
+        messages: conv.messages.map((m) => ({
+          role: m.role,
+          content: m.content,
+          service: m.service,
+          model: m.model,
+          timestamp: m.timestamp,
+        })),
+      },
+      null,
+      2,
+    );
+    ext = "json";
+    mime = "application/json";
   } else {
-    content = `${conv.title}\nExportado: ${new Date().toLocaleString()}\n${'='.repeat(50)}\n\n`;
-    conv.messages.forEach(m => {
-      content += `[${m.role === 'user' ? 'TÚ' : `ASISTENTE${m.service ? ` - ${m.service}` : ''}`}]\n${m.content}\n\n${'-'.repeat(40)}\n\n`;
+    content = `${conv.title}\nExportado: ${new Date().toLocaleString()}\n${"=".repeat(50)}\n\n`;
+    conv.messages.forEach((m) => {
+      content += `[${m.role === "user" ? "TÚ" : `ASISTENTE${m.service ? ` - ${m.service}` : ""}`}]\n${m.content}\n\n${"-".repeat(40)}\n\n`;
     });
-    ext = 'txt'; mime = 'text/plain';
+    ext = "txt";
+    mime = "text/plain";
   }
   const blob = new Blob([content], { type: mime });
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = `neuralchat-${conv.title.slice(0, 30).replace(/\s+/g, '-')}.${ext}`;
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `neuralchat-${conv.title.slice(0, 30).replace(/\s+/g, "-")}.${ext}`;
   a.click();
   URL.revokeObjectURL(url);
   closeExport();
-  toast(`Exportado como .${ext} ✓`, 'success');
+  toast(`Exportado como .${ext} ✓`, "success");
 }
 
 // ═══════════════════════════════════════════════════════
 //  THEME
 // ═══════════════════════════════════════════════════════
 function toggleTheme() {
-  const current = document.documentElement.getAttribute('data-theme');
-  const next = current === 'dark' ? 'light' : 'dark';
-  document.documentElement.setAttribute('data-theme', next);
+  const current = document.documentElement.getAttribute("data-theme");
+  const next = current === "dark" ? "light" : "dark";
+  document.documentElement.setAttribute("data-theme", next);
   updateThemeUI();
-  const hljsLink = document.getElementById('hljs-theme');
-  if (hljsLink) hljsLink.href = next === 'dark'
-    ? 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/tokyo-night-dark.min.css'
-    : 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css';
+  const hljsLink = document.getElementById("hljs-theme");
+  if (hljsLink)
+    hljsLink.href =
+      next === "dark"
+        ? "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/tokyo-night-dark.min.css"
+        : "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css";
   saveToStorage();
 }
 
 function updateThemeUI() {
-  const theme = document.documentElement.getAttribute('data-theme');
-  const label = document.getElementById('theme-label');
-  if (label) label.textContent = theme === 'dark' ? 'Modo claro' : 'Modo oscuro';
+  const theme = document.documentElement.getAttribute("data-theme");
+  const label = document.getElementById("theme-label");
+  if (label)
+    label.textContent = theme === "dark" ? "Modo claro" : "Modo oscuro";
 }
 
 function applyTheme() {
-  const theme = document.documentElement.getAttribute('data-theme');
+  const theme = document.documentElement.getAttribute("data-theme");
   updateThemeUI();
-  const hljsLink = document.getElementById('hljs-theme');
-  if (hljsLink) hljsLink.href = theme === 'dark'
-    ? 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/tokyo-night-dark.min.css'
-    : 'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css';
+  const hljsLink = document.getElementById("hljs-theme");
+  if (hljsLink)
+    hljsLink.href =
+      theme === "dark"
+        ? "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/tokyo-night-dark.min.css"
+        : "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css";
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1276,11 +1430,12 @@ function applyTheme() {
 // ═══════════════════════════════════════════════════════
 async function triggerNotification(service) {
   if (document.hasFocus()) return;
-  if ('Notification' in window) {
-    if (Notification.permission === 'default') await Notification.requestPermission();
-    if (Notification.permission === 'granted') {
-      new Notification('NeuralChat', {
-        body: `${service || 'AI'} ha respondido`,
+  if ("Notification" in window) {
+    if (Notification.permission === "default")
+      await Notification.requestPermission();
+    if (Notification.permission === "granted") {
+      new Notification("NeuralChat", {
+        body: `${service || "AI"} ha respondido`,
         icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%237c6af7'/><text x='50%' y='55%' dominant-baseline='middle' text-anchor='middle' font-size='18'>⚡</text></svg>",
       });
     }
@@ -1291,34 +1446,46 @@ async function triggerNotification(service) {
 //  KEYBOARD SHORTCUTS
 // ═══════════════════════════════════════════════════════
 function setupKeyboardShortcuts() {
-  document.addEventListener('keydown', e => {
+  document.addEventListener("keydown", (e) => {
     const tag = document.activeElement?.tagName;
-    const inInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+    const inInput = tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
 
-    if (e.key === 'Escape') {
+    if (e.key === "Escape") {
       if (state.streaming) stopStreaming();
-      document.getElementById('system-panel')?.classList.remove('open');
-      document.getElementById('btn-system')?.classList.remove('active');
-      document.getElementById('export-panel')?.classList.remove('open');
-      document.getElementById('settings-panel')?.classList.remove('open');
+      document.getElementById("system-panel")?.classList.remove("open");
+      document.getElementById("btn-system")?.classList.remove("active");
+      document.getElementById("export-panel")?.classList.remove("open");
+      document.getElementById("settings-panel")?.classList.remove("open");
       closeServiceDropdown();
       closeLightbox();
     }
-    if ((e.ctrlKey || e.metaKey) && e.key === 'k') { e.preventDefault(); newConversation(); }
-    if ((e.ctrlKey || e.metaKey) && e.key === '/') { e.preventDefault(); toggleSystemPanel(); }
-    if ((e.ctrlKey || e.metaKey) && e.key === ',') { e.preventDefault(); openSettings(); }
-    if ((e.ctrlKey || e.metaKey) && e.key === 'e') { e.preventDefault(); openExport(); }
+    if ((e.ctrlKey || e.metaKey) && e.key === "k") {
+      e.preventDefault();
+      newConversation();
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key === "/") {
+      e.preventDefault();
+      toggleSystemPanel();
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key === ",") {
+      e.preventDefault();
+      openSettings();
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key === "e") {
+      e.preventDefault();
+      openExport();
+    }
 
     // Search: "/" when not in input focuses search
-    if (e.key === '/' && !inInput) {
+    if (e.key === "/" && !inInput) {
       e.preventDefault();
-      document.getElementById('conv-search')?.focus();
+      document.getElementById("conv-search")?.focus();
     }
   });
 }
 
 function handleKeydown(e) {
-  if (e.key === 'Enter' && !e.shiftKey) {
+  if (e.key === "Enter" && !e.shiftKey) {
     e.preventDefault();
     sendMessage();
   }
@@ -1329,31 +1496,34 @@ function handleKeydown(e) {
 // ═══════════════════════════════════════════════════════
 function toggleSidebar() {
   if (window.innerWidth <= 768) {
-    document.getElementById('sidebar')?.classList.toggle('mobile-open');
+    document.getElementById("sidebar")?.classList.toggle("mobile-open");
   } else {
-    const sidebar = document.getElementById('sidebar');
+    const sidebar = document.getElementById("sidebar");
     if (!sidebar) return;
-    sidebar.classList.toggle('collapsed');
-    state.sidebarOpen = !sidebar.classList.contains('collapsed');
+    sidebar.classList.toggle("collapsed");
+    state.sidebarOpen = !sidebar.classList.contains("collapsed");
   }
 }
 
 function closeMobileSidebar() {
-  document.getElementById('sidebar')?.classList.remove('mobile-open');
+  document.getElementById("sidebar")?.classList.remove("mobile-open");
 }
 
 // ═══════════════════════════════════════════════════════
 //  UTILS
 // ═══════════════════════════════════════════════════════
 function autoResize(el) {
-  el.style.height = 'auto';
-  el.style.height = Math.min(el.scrollHeight, 240) + 'px';
+  el.style.height = "auto";
+  el.style.height = Math.min(el.scrollHeight, 240) + "px";
 }
 
 function escHtml(str) {
   return String(str)
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 function capitalize(str) {
@@ -1361,8 +1531,11 @@ function capitalize(str) {
 }
 
 function useChip(text) {
-  if (!hasAnyApiKey()) { openSettings(); return; }
-  const input = document.getElementById('msg-input');
+  if (!hasAnyApiKey()) {
+    openSettings();
+    return;
+  }
+  const input = document.getElementById("msg-input");
   if (!input) return;
   input.value = text;
   autoResize(input);
@@ -1374,30 +1547,30 @@ function useChip(text) {
 // ═══════════════════════════════════════════════════════
 let toastIdCounter = 0;
 
-function toast(msg, type = 'info', duration = 3500) {
-  const container = document.getElementById('toast-container');
+function toast(msg, type = "info", duration = 3500) {
+  const container = document.getElementById("toast-container");
   if (!container) return;
-  const id = 'toast_' + (++toastIdCounter);
-  const el = document.createElement('div');
+  const id = "toast_" + ++toastIdCounter;
+  const el = document.createElement("div");
   el.id = id;
   el.className = `toast ${type}`;
-  const icons = { info: '●', success: '✓', error: '✕' };
-  el.innerHTML = `<span class="toast-icon">${icons[type] || '●'}</span><span>${escHtml(msg)}</span>`;
+  const icons = { info: "●", success: "✓", error: "✕" };
+  el.innerHTML = `<span class="toast-icon">${icons[type] || "●"}</span><span>${escHtml(msg)}</span>`;
   container.appendChild(el);
   setTimeout(() => {
-    el.style.animation = 'toastOut 0.25s ease-in forwards';
+    el.style.animation = "toastOut 0.25s ease-in forwards";
     setTimeout(() => el.remove(), 250);
   }, duration);
   return id;
 }
 
 function toastProgress(msg) {
-  const container = document.getElementById('toast-container');
+  const container = document.getElementById("toast-container");
   if (!container) return null;
-  const id = 'toast_' + (++toastIdCounter);
-  const el = document.createElement('div');
+  const id = "toast_" + ++toastIdCounter;
+  const el = document.createElement("div");
   el.id = id;
-  el.className = 'toast info';
+  el.className = "toast info";
   el.innerHTML = `<span class="toast-spinner"></span><span>${escHtml(msg)}</span>`;
   container.appendChild(el);
   return id;
@@ -1407,7 +1580,7 @@ function removeToast(id) {
   if (!id) return;
   const el = document.getElementById(id);
   if (el) {
-    el.style.animation = 'toastOut 0.2s ease-in forwards';
+    el.style.animation = "toastOut 0.2s ease-in forwards";
     setTimeout(() => el.remove(), 200);
   }
 }
