@@ -768,9 +768,7 @@ async function sendMessage() {
       displayType: f.displayType,
       preview: f.displayType === "image" ? f.content : null,
       fileContent:
-        f.displayType === "text"
-          ? truncateFileContent(f.content)
-          : null,
+        f.displayType === "text" ? truncateFileContent(f.content) : null,
     })),
   };
 

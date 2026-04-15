@@ -35,7 +35,7 @@ const server = Bun.serve({
         return new Response(staticFiles.css, {
           headers: {
             "Content-Type": "text/css; charset=utf-8",
-            "Cache-Control": "public, max-age=3600",
+            "Cache-Control": "no-cache",
             ...corsHeaders,
           },
         });
@@ -47,7 +47,7 @@ const server = Bun.serve({
         return new Response(staticFiles.js, {
           headers: {
             "Content-Type": "application/javascript; charset=utf-8",
-            "Cache-Control": "public, max-age=3600",
+            "Cache-Control": "no-cache",
             ...corsHeaders,
           },
         });

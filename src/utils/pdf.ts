@@ -1,6 +1,6 @@
 export async function extractPdfText(buffer: ArrayBuffer): Promise<string> {
   const bytes = new Uint8Array(buffer);
-  const str = new TextDecoder("latin1").decode(bytes);
+  const str = new TextDecoder().decode(bytes);
   const texts: string[] = [];
   const btEtRegex = /BT([\s\S]*?)ET/g;
   let match: RegExpExecArray | null;

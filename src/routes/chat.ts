@@ -77,10 +77,13 @@ export async function handleChatRoute(req: Request): Promise<Response> {
   } catch (err: unknown) {
     const errorMessage = getErrorMessage(err);
     console.error(`[ERROR] service.chat(${service.name}):`, err);
-    return new Response(JSON.stringify({ error: errorMessage || "Service error" }), {
-      status: 500,
-      headers: { "Content-Type": "application/json", ...corsHeaders },
-    });
+    return new Response(
+      JSON.stringify({ error: errorMessage || "Service error" }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      },
+    );
   }
 
   const readable = new ReadableStream({
