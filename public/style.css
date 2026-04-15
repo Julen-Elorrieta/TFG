@@ -1,12 +1,8 @@
-/* ═══════════════════════════════════════════════════════
-   DESIGN TOKENS
-═══════════════════════════════════════════════════════ */
 :root {
   --font-ui: "DM Sans", sans-serif;
   --font-display: "Syne", sans-serif;
   --font-mono: "JetBrains Mono", monospace;
 
-  /* Dark theme */
   --bg-base: #09090e;
   --bg-surface: #0f0f18;
   --bg-elevated: #181825;
@@ -83,9 +79,6 @@
   --shadow-accent: 0 0 20px rgba(91, 77, 232, 0.1);
 }
 
-/* ═══════════════════════════════════════════════════════
-   RESET & BASE
-═══════════════════════════════════════════════════════ */
 *,
 *::before,
 *::after {
@@ -149,16 +142,12 @@ a:hover {
   background: var(--text-muted);
 }
 
-/* ═══════════════════════════════════════════════════════
-   LAYOUT
-═══════════════════════════════════════════════════════ */
 #app {
   display: flex;
   height: 100vh;
   overflow: hidden;
 }
 
-/* ── Sidebar ─────────────────────────────────────────── */
 #sidebar {
   width: var(--sidebar-w);
   background: var(--bg-surface);
@@ -234,7 +223,6 @@ a:hover {
   box-shadow: 0 4px 16px var(--accent-glow);
 }
 
-/* Search */
 .conv-search-wrap {
   margin: 0 10px 6px;
   position: relative;
@@ -455,7 +443,6 @@ a:hover {
   box-shadow: 0 0 6px rgba(74, 222, 128, 0.4);
 }
 
-/* ── Main area ─────────────────────────────────────── */
 #main {
   flex: 1;
   display: flex;
@@ -464,7 +451,6 @@ a:hover {
   min-width: 0;
 }
 
-/* ── Header ─────────────────────────────────────────── */
 #header {
   height: var(--header-h);
   display: flex;
@@ -510,7 +496,6 @@ a:hover {
   gap: 4px;
 }
 
-/* ── Service selector custom dropdown ─────────────────── */
 .svc-dropdown-wrap {
   position: relative;
 }
@@ -714,7 +699,6 @@ a:hover {
   color: var(--accent-light);
 }
 
-/* ── No-keys banner ──────────────────────────────────── */
 .no-keys-banner {
   display: flex;
   align-items: center;
@@ -755,7 +739,6 @@ a:hover {
   background: var(--accent-light);
 }
 
-/* ── Messages ────────────────────────────────────────── */
 #messages-container {
   flex: 1;
   overflow-y: auto;
@@ -936,7 +919,6 @@ a:hover {
   margin: 16px 0;
 }
 
-/* Streaming cursor */
 .streaming-cursor::after {
   content: "▋";
   display: inline-block;
@@ -956,7 +938,6 @@ a:hover {
   }
 }
 
-/* Message actions */
 .msg-actions {
   display: none;
   gap: 4px;
@@ -991,7 +972,6 @@ a:hover {
   border-color: var(--border-strong);
 }
 
-/* Code blocks */
 .code-block-wrapper {
   border-radius: 10px;
   overflow: hidden;
@@ -1047,7 +1027,6 @@ a:hover {
   font-size: 13px !important;
 }
 
-/* File chips in messages */
 .msg-files {
   display: flex;
   flex-wrap: wrap;
@@ -1119,7 +1098,6 @@ a:hover {
   color: var(--text-muted);
 }
 
-/* ── Welcome screen ──────────────────────────────────── */
 #welcome {
   display: flex;
   flex-direction: column;
@@ -1199,7 +1177,6 @@ a:hover {
   transform: translateY(-1px);
 }
 
-/* ── Input area ──────────────────────────────────────── */
 #input-area {
   padding: 10px 16px 14px;
   background: var(--bg-base);
@@ -1421,7 +1398,6 @@ a:hover {
   padding: 2px 0;
 }
 
-/* ── System Prompt Panel ─────────────────────────────── */
 #system-panel {
   position: fixed;
   top: 0;
@@ -1526,7 +1502,22 @@ a:hover {
   color: var(--text-primary);
 }
 
-/* ── Export panel ────────────────────────────────────── */
+.export-option-name,
+#system-panel .export-option .tpl-title {
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 13.5px;
+  line-height: 1.3;
+}
+
+.export-option-desc,
+#system-panel .export-option .tpl-sub {
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  margin-top: 2px;
+  line-height: 1.4;
+}
+
 #export-panel {
   position: fixed;
   inset: 0;
@@ -1560,7 +1551,6 @@ a:hover {
   overflow: hidden;
 }
 
-/* Header */
 .export-modal-header {
   display: flex;
   align-items: center;
@@ -1619,7 +1609,6 @@ a:hover {
   color: var(--text-primary);
 }
 
-/* Options */
 .export-options {
   display: flex;
   flex-direction: column;
@@ -1695,10 +1684,6 @@ a:hover {
 }
 
 .export-option-name {
-  font-weight: 600;
-  font-size: 13.5px;
-  color: var(--text-primary);
-  line-height: 1.3;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -1715,13 +1700,6 @@ a:hover {
   padding: 1px 5px;
 }
 
-.export-option-desc {
-  font-size: 11.5px;
-  color: var(--text-secondary);
-  margin-top: 2px;
-  line-height: 1.4;
-}
-
 .export-option-arrow {
   color: var(--text-muted);
   flex-shrink: 0;
@@ -1731,9 +1709,6 @@ a:hover {
     transform var(--transition);
 }
 
-/* ══════════════════════════════════════════════════════
-   SETTINGS PANEL (API Keys)
-══════════════════════════════════════════════════════ */
 #settings-panel {
   position: fixed;
   inset: 0;
@@ -2005,7 +1980,6 @@ a:hover {
   margin-top: 2px;
 }
 
-/* ── Typing indicator ────────────────────────────────── */
 .typing-indicator {
   display: flex;
   align-items: center;
@@ -2043,7 +2017,6 @@ a:hover {
   }
 }
 
-/* ── Toast notifications ─────────────────────────────── */
 #toast-container {
   position: fixed;
   bottom: 20px;
@@ -2133,7 +2106,6 @@ a:hover {
   }
 }
 
-/* ── Edit message ────────────────────────────────────── */
 .msg-edit-area {
   width: 100%;
   background: var(--bg-elevated);
@@ -2155,7 +2127,6 @@ a:hover {
   margin-top: 7px;
 }
 
-/* ── Lightbox ────────────────────────────────────────── */
 #lightbox {
   position: fixed;
   inset: 0;
@@ -2210,7 +2181,6 @@ a:hover {
   background: var(--bg-hover);
 }
 
-/* ── Misc ────────────────────────────────────────────── */
 .empty-conversations {
   padding: 24px 14px;
   text-align: center;
@@ -2219,7 +2189,6 @@ a:hover {
   line-height: 1.7;
 }
 
-/* ── Responsive ──────────────────────────────────────── */
 @media (max-width: 768px) {
   #sidebar {
     position: fixed;

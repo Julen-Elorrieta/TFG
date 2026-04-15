@@ -1,13 +1,21 @@
-// ═══════════════════════════════════════════════════════
-//  NEURALCHAT v2 — STATE
-// ═══════════════════════════════════════════════════════
 const API = "";
 
-// Default models per service
 const DEFAULT_MODELS = {
   groq: "moonshotai/kimi-k2-instruct-0905",
   cerebras: "gpt-oss-120b",
   openrouter: "openrouter/auto",
+};
+const SERVICES = ["groq", "cerebras", "openrouter"];
+const DEFAULT_SERVICE_OPTIONS = ["auto", ...SERVICES];
+const SERVICE_HEADERS = {
+  groq: { key: "X-Groq-Key", model: "X-Groq-Model" },
+  cerebras: { key: "X-Cerebras-Key", model: "X-Cerebras-Model" },
+  openrouter: { key: "X-Openrouter-Key", model: "X-Openrouter-Model" },
+};
+const HIGHLIGHT_THEMES = {
+  dark: "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/tokyo-night-dark.min.css",
+  light:
+    "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css",
 };
 
 let state = {
@@ -18,7 +26,6 @@ let state = {
   streaming: false,
   abortController: null,
   searchQuery: "",
-  // API keys & models (stored in localStorage, sent as headers)
   apiKeys: {
     groq: { key: "", model: DEFAULT_MODELS.groq },
     cerebras: { key: "", model: DEFAULT_MODELS.cerebras },
@@ -32,7 +39,12 @@ function getErrorMessage(error, fallback = "Error desconocido") {
   return fallback;
 }
 
-// ── Init ─────────────────────────────────────────────
+function setHighlightTheme(theme) {
+  const hljsLink = document.getElementById("hljs-theme");
+  if (!hljsLink) return;
+  hljsLink.href = HIGHLIGHT_THEMES[theme] || HIGHLIGHT_THEMES.dark;
+}
+
 function init() {
   loadFromStorage();
   renderConversationList();
@@ -53,9 +65,6 @@ function updateSidebarKeysIndicator() {
   indicator.className = "keys-indicator" + (hasKeys ? " has-keys" : "");
 }
 
-// ═══════════════════════════════════════════════════════
-//  STORAGE
-// ═══════════════════════════════════════════════════════
 function saveToStorage() {
   try {
     const toSave = {
@@ -66,8 +75,8 @@ function saveToStorage() {
       apiKeys: state.apiKeys,
     };
     localStorage.setItem("neuralchat_v2", JSON.stringify(toSave));
-  } catch {
-    console.warn("Storage save failed", e);
+  } catch (error) {
+    console.warn("Storage save failed", error);
   }
 }
 
@@ -96,7 +105,6 @@ function loadFromStorage() {
     if (saved.theme)
       document.documentElement.setAttribute("data-theme", saved.theme);
     if (saved.apiKeys) {
-      // Merge saved keys into defaults (handles new service additions)
       Object.keys(saved.apiKeys).forEach((k) => {
         if (state.apiKeys[k]) {
           state.apiKeys[k] = { ...state.apiKeys[k], ...saved.apiKeys[k] };
@@ -104,31 +112,19 @@ function loadFromStorage() {
       });
     }
     updateThemeUI();
-  } catch {
-    console.warn("Storage load failed", e);
+  } catch (error) {
+    console.warn("Storage load failed", error);
   }
 }
 
-// ═══════════════════════════════════════════════════════
-//  API KEY MANAGEMENT
-// ═══════════════════════════════════════════════════════
 function getApiHeaders() {
   const headers = {};
-  const keys = state.apiKeys;
-  if (keys.groq.key) {
-    headers["X-Groq-Key"] = keys.groq.key;
-    headers["X-Groq-Model"] = keys.groq.model || DEFAULT_MODELS.groq;
-  }
-  if (keys.cerebras.key) {
-    headers["X-Cerebras-Key"] = keys.cerebras.key;
-    headers["X-Cerebras-Model"] =
-      keys.cerebras.model || DEFAULT_MODELS.cerebras;
-  }
-  if (keys.openrouter.key) {
-    headers["X-Openrouter-Key"] = keys.openrouter.key;
-    headers["X-Openrouter-Model"] =
-      keys.openrouter.model || DEFAULT_MODELS.openrouter;
-  }
+  SERVICES.forEach((svc) => {
+    const cfg = state.apiKeys[svc];
+    if (!cfg?.key) return;
+    headers[SERVICE_HEADERS[svc].key] = cfg.key;
+    headers[SERVICE_HEADERS[svc].model] = cfg.model || DEFAULT_MODELS[svc];
+  });
   return headers;
 }
 
@@ -152,10 +148,10 @@ async function loadServices() {
         ? data.services
         : hasAnyApiKey()
           ? []
-          : ["auto", "groq", "cerebras", "openrouter"];
+          : DEFAULT_SERVICE_OPTIONS;
     renderServiceDropdown(services);
   } catch {
-    renderServiceDropdown(["auto", "groq", "cerebras", "openrouter"]);
+    renderServiceDropdown(DEFAULT_SERVICE_OPTIONS);
   }
   updateServiceBadge();
   updateInputState();
@@ -197,7 +193,6 @@ function toggleServiceDropdown(e) {
   const isOpen = dropdown.classList.toggle("open");
   btn.classList.toggle("open", isOpen);
   if (isOpen) {
-    // Close on outside click
     setTimeout(() => {
       document.addEventListener("click", closeServiceDropdown, { once: true });
     }, 0);
@@ -235,7 +230,6 @@ function updateInputState() {
   if (noKeysBanner) noKeysBanner.style.display = hasKeys ? "none" : "flex";
 }
 
-// Settings Panel
 function openSettings() {
   const panel = document.getElementById("settings-panel");
   if (!panel) return;
@@ -248,7 +242,7 @@ function closeSettings() {
 }
 
 function populateSettingsForm() {
-  ["groq", "cerebras", "openrouter"].forEach((svc) => {
+  SERVICES.forEach((svc) => {
     const keyEl = document.getElementById(`key-${svc}`);
     const modelEl = document.getElementById(`model-${svc}`);
     if (keyEl) keyEl.value = state.apiKeys[svc]?.key || "";
@@ -259,7 +253,7 @@ function populateSettingsForm() {
 }
 
 function updateKeyStatuses() {
-  ["groq", "cerebras", "openrouter"].forEach((svc) => {
+  SERVICES.forEach((svc) => {
     const indicator = document.getElementById(`status-${svc}`);
     if (indicator) {
       const hasKey = !!state.apiKeys[svc]?.key?.trim();
@@ -271,7 +265,7 @@ function updateKeyStatuses() {
 }
 
 function saveSettings() {
-  ["groq", "cerebras", "openrouter"].forEach((svc) => {
+  SERVICES.forEach((svc) => {
     const keyEl = document.getElementById(`key-${svc}`);
     const modelEl = document.getElementById(`model-${svc}`);
     if (keyEl) state.apiKeys[svc].key = keyEl.value.trim();
@@ -314,7 +308,6 @@ async function loadModelsForService(svc) {
   const loadBtn = document.getElementById(`load-models-${svc}`);
   if (!modelEl || !loadBtn) return;
 
-  // Check key before fetching
   const keyEl = document.getElementById(`key-${svc}`);
   const tempKey = keyEl?.value?.trim();
   if (!tempKey && !state.apiKeys[svc]?.key) {
@@ -324,9 +317,7 @@ async function loadModelsForService(svc) {
 
   const tempHeaders = { ...getApiHeaders() };
   if (tempKey) {
-    if (svc === "groq") tempHeaders["X-Groq-Key"] = tempKey;
-    if (svc === "cerebras") tempHeaders["X-Cerebras-Key"] = tempKey;
-    if (svc === "openrouter") tempHeaders["X-Openrouter-Key"] = tempKey;
+    tempHeaders[SERVICE_HEADERS[svc].key] = tempKey;
   }
 
   loadBtn.disabled = true;
@@ -367,9 +358,6 @@ function updateServiceBadge() {
   }
 }
 
-// ═══════════════════════════════════════════════════════
-//  CONVERSATIONS
-// ═══════════════════════════════════════════════════════
 function newConversation() {
   const id = "conv_" + Date.now();
   state.conversations[id] = {
@@ -464,7 +452,6 @@ function updateConvTitle(id, messages) {
   }
 }
 
-// ── Search ────────────────────────────────────────────
 function onSearchInput(val) {
   state.searchQuery = val.toLowerCase();
   const clearBtn = document.getElementById("search-clear-btn");
@@ -481,11 +468,7 @@ function clearSearch() {
   renderConversationList();
 }
 
-// ═══════════════════════════════════════════════════════
-//  RENDER CONVERSATIONS LIST
-// ═══════════════════════════════════════════════════════
 function getMsgText(m) {
-  // Unified getter for the readable text of any message
   return (m.displayText || m.rawText || m.content || "").trim();
 }
 
@@ -517,7 +500,6 @@ function renderConversationList() {
 
   list.innerHTML = convs
     .map((c) => {
-      // For preview: find last non-system message and extract clean text
       const lastMsg = c.messages
         .filter((m) => m.role !== "system")
         .slice(-1)[0];
@@ -573,9 +555,6 @@ function formatRelativeTime(ts) {
   });
 }
 
-// ═══════════════════════════════════════════════════════
-//  RENDER MESSAGES
-// ═══════════════════════════════════════════════════════
 function renderMessages() {
   const inner = document.getElementById("messages-inner");
   if (!inner) return;
@@ -738,9 +717,6 @@ function scrollToBottom(smooth = true) {
   c.scrollTo({ top: c.scrollHeight, behavior: smooth ? "smooth" : "auto" });
 }
 
-// ═══════════════════════════════════════════════════════
-//  SEND MESSAGE
-// ═══════════════════════════════════════════════════════
 async function sendMessage() {
   if (!hasAnyApiKey()) {
     toast("Configura tus API keys primero", "error");
@@ -812,9 +788,6 @@ function buildApiContent(msg) {
   return (msg.content ? msg.content + "\n\n" : "") + extra.trim();
 }
 
-// ═══════════════════════════════════════════════════════
-//  STREAMING
-// ═══════════════════════════════════════════════════════
 async function streamResponse(conv, retryCount = 0) {
   setStreaming(true);
 
@@ -911,7 +884,6 @@ async function streamResponse(conv, retryCount = 0) {
       }
     }
 
-    // Finalize message
     assistantMsg.content = fullContent;
     assistantMsg.service = usedService;
     assistantMsg.model = usedModel;
@@ -945,7 +917,6 @@ async function streamResponse(conv, retryCount = 0) {
       err instanceof Error &&
       err.message.includes("fetch")
     ) {
-      // Auto-retry once on network error
       toast("Reintentando conexión...", "info");
       setStreaming(false);
       await new Promise((r) => setTimeout(r, 1500));
@@ -1008,9 +979,6 @@ function stopStreaming() {
   if (state.abortController) state.abortController.abort();
 }
 
-// ═══════════════════════════════════════════════════════
-//  MESSAGE ACTIONS
-// ═══════════════════════════════════════════════════════
 function copyMessage(idx) {
   const conv = getCurrentConv();
   if (!conv) return;
@@ -1087,9 +1055,6 @@ function copyCodeBlock(btn) {
   });
 }
 
-// ═══════════════════════════════════════════════════════
-//  FILE HANDLING
-// ═══════════════════════════════════════════════════════
 async function handleFileInput(event) {
   const files = Array.from(event.target.files);
   event.target.value = "";
@@ -1235,7 +1200,6 @@ function lbKeyHandler(e) {
   if (e.key === "Escape") closeLightbox();
 }
 
-// ── Drag & Drop ──────────────────────────────────────
 function setupDragDrop() {
   const body = document.body;
   const wrap = document.getElementById("textarea-wrap");
@@ -1256,9 +1220,6 @@ function setupDragDrop() {
   });
 }
 
-// ═══════════════════════════════════════════════════════
-//  SYSTEM PROMPT
-// ═══════════════════════════════════════════════════════
 function toggleSystemPanel() {
   const panel = document.getElementById("system-panel");
   const btn = document.getElementById("btn-system");
@@ -1316,9 +1277,6 @@ function applyTemplate(key) {
   }
 }
 
-// ═══════════════════════════════════════════════════════
-//  EXPORT
-// ═══════════════════════════════════════════════════════
 function openExport() {
   const conv = getCurrentConv();
   if (!conv || conv.messages.length === 0) {
@@ -1387,20 +1345,12 @@ function exportAs(format) {
   toast(`Exportado como .${ext} ✓`, "success");
 }
 
-// ═══════════════════════════════════════════════════════
-//  THEME
-// ═══════════════════════════════════════════════════════
 function toggleTheme() {
   const current = document.documentElement.getAttribute("data-theme");
   const next = current === "dark" ? "light" : "dark";
   document.documentElement.setAttribute("data-theme", next);
   updateThemeUI();
-  const hljsLink = document.getElementById("hljs-theme");
-  if (hljsLink)
-    hljsLink.href =
-      next === "dark"
-        ? "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/tokyo-night-dark.min.css"
-        : "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css";
+  setHighlightTheme(next);
   saveToStorage();
 }
 
@@ -1414,17 +1364,9 @@ function updateThemeUI() {
 function applyTheme() {
   const theme = document.documentElement.getAttribute("data-theme");
   updateThemeUI();
-  const hljsLink = document.getElementById("hljs-theme");
-  if (hljsLink)
-    hljsLink.href =
-      theme === "dark"
-        ? "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/tokyo-night-dark.min.css"
-        : "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css";
+  setHighlightTheme(theme);
 }
 
-// ═══════════════════════════════════════════════════════
-//  NOTIFICATIONS
-// ═══════════════════════════════════════════════════════
 async function triggerNotification(service) {
   if (document.hasFocus()) return;
   if ("Notification" in window) {
@@ -1439,9 +1381,6 @@ async function triggerNotification(service) {
   }
 }
 
-// ═══════════════════════════════════════════════════════
-//  KEYBOARD SHORTCUTS
-// ═══════════════════════════════════════════════════════
 function setupKeyboardShortcuts() {
   document.addEventListener("keydown", (e) => {
     const tag = document.activeElement?.tagName;
@@ -1473,7 +1412,6 @@ function setupKeyboardShortcuts() {
       openExport();
     }
 
-    // Search: "/" when not in input focuses search
     if (e.key === "/" && !inInput) {
       e.preventDefault();
       document.getElementById("conv-search")?.focus();
@@ -1488,9 +1426,6 @@ function handleKeydown(e) {
   }
 }
 
-// ═══════════════════════════════════════════════════════
-//  SIDEBAR
-// ═══════════════════════════════════════════════════════
 function toggleSidebar() {
   if (window.innerWidth <= 768) {
     document.getElementById("sidebar")?.classList.toggle("mobile-open");
@@ -1505,9 +1440,6 @@ function closeMobileSidebar() {
   document.getElementById("sidebar")?.classList.remove("mobile-open");
 }
 
-// ═══════════════════════════════════════════════════════
-//  UTILS
-// ═══════════════════════════════════════════════════════
 function autoResize(el) {
   el.style.height = "auto";
   el.style.height = Math.min(el.scrollHeight, 240) + "px";
@@ -1538,9 +1470,6 @@ function useChip(text) {
   input.focus();
 }
 
-// ═══════════════════════════════════════════════════════
-//  TOAST SYSTEM
-// ═══════════════════════════════════════════════════════
 let toastIdCounter = 0;
 
 function toast(msg, type = "info", duration = 3500) {
@@ -1581,7 +1510,4 @@ function removeToast(id) {
   }
 }
 
-// ═══════════════════════════════════════════════════════
-//  BOOT
-// ═══════════════════════════════════════════════════════
 init();
