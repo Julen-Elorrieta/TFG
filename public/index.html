@@ -174,7 +174,7 @@
               <button
                 id="service-selector"
                 onclick="toggleServiceDropdown(event)"
-                title="Seleccionar servicio AI"
+                title="Modo de respuesta"
                 aria-haspopup="listbox"
               >
                 <svg
@@ -202,9 +202,6 @@
                 >
                   <polyline points="6 9 12 15 18 9" />
                 </svg>
-                <span id="current-service-badge" class="service-badge"
-                  >AUTO</span
-                >
               </button>
               <div id="service-dropdown" class="svc-dropdown" role="listbox">
                 <!-- populated by JS -->
@@ -495,6 +492,14 @@
                   >Obtener key →</a
                 >
               </div>
+              <label class="service-enable-switch" title="Habilitar/deshabilitar servicio">
+                <input
+                  type="checkbox"
+                  id="enabled-groq"
+                  onchange="toggleServiceEnabled('groq', this.checked)"
+                />
+                <span class="service-enable-slider"></span>
+              </label>
             </div>
             <div class="service-config-fields">
               <div class="key-input-wrap">
@@ -505,6 +510,7 @@
                   class="key-input"
                   autocomplete="off"
                   spellcheck="false"
+                  oninput="onApiKeyInput('groq')"
                 />
                 <button
                   class="key-toggle-btn"
@@ -525,6 +531,13 @@
                   </svg>
                 </button>
                 <button
+                  class="key-copy-btn"
+                  onclick="copyApiKey('groq')"
+                  title="Copiar API key"
+                >
+                  ⧉
+                </button>
+                <button
                   class="key-clear-btn"
                   onclick="clearKey('groq')"
                   title="Eliminar clave"
@@ -533,23 +546,9 @@
                 </button>
               </div>
               <div class="model-row">
-                <input
-                  type="text"
-                  id="model-groq"
-                  placeholder="moonshotai/kimi-k2-instruct-0905"
-                  class="model-input"
-                  list="groq-models"
-                  value="moonshotai/kimi-k2-instruct-0905"
-                />
-                <datalist id="groq-models">
-                  <option value="moonshotai/kimi-k2-instruct-0905" />
-                  <option value="deepseek-r1-distill-llama-70b" />
-                  <option value="llama-3.3-70b-versatile" />
-                  <option value="llama3-70b-8192" />
-                  <option value="llama3-8b-8192" />
-                  <option value="mixtral-8x7b-32768" />
-                  <option value="gemma2-9b-it" />
-                </datalist>
+                <select id="model-groq" class="model-input" disabled>
+                  <option value="">Escribe API key para cargar modelos</option>
+                </select>
                 <button
                   class="load-models-btn"
                   id="load-models-groq"
@@ -578,6 +577,14 @@
                   >Obtener key →</a
                 >
               </div>
+              <label class="service-enable-switch" title="Habilitar/deshabilitar servicio">
+                <input
+                  type="checkbox"
+                  id="enabled-cerebras"
+                  onchange="toggleServiceEnabled('cerebras', this.checked)"
+                />
+                <span class="service-enable-slider"></span>
+              </label>
             </div>
             <div class="service-config-fields">
               <div class="key-input-wrap">
@@ -588,6 +595,7 @@
                   class="key-input"
                   autocomplete="off"
                   spellcheck="false"
+                  oninput="onApiKeyInput('cerebras')"
                 />
                 <button
                   class="key-toggle-btn"
@@ -608,6 +616,13 @@
                   </svg>
                 </button>
                 <button
+                  class="key-copy-btn"
+                  onclick="copyApiKey('cerebras')"
+                  title="Copiar API key"
+                >
+                  ⧉
+                </button>
+                <button
                   class="key-clear-btn"
                   onclick="clearKey('cerebras')"
                   title="Eliminar clave"
@@ -616,19 +631,9 @@
                 </button>
               </div>
               <div class="model-row">
-                <input
-                  type="text"
-                  id="model-cerebras"
-                  placeholder="gpt-oss-120b"
-                  class="model-input"
-                  list="cerebras-models"
-                  value="gpt-oss-120b"
-                />
-                <datalist id="cerebras-models">
-                  <option value="gpt-oss-120b" />
-                  <option value="llama3.1-8b" />
-                  <option value="qwen-3-235b-a22b-instruct-2507" />
-                </datalist>
+                <select id="model-cerebras" class="model-input" disabled>
+                  <option value="">Escribe API key para cargar modelos</option>
+                </select>
                 <button
                   class="load-models-btn"
                   id="load-models-cerebras"
@@ -657,6 +662,14 @@
                   >Obtener key →</a
                 >
               </div>
+              <label class="service-enable-switch" title="Habilitar/deshabilitar servicio">
+                <input
+                  type="checkbox"
+                  id="enabled-openrouter"
+                  onchange="toggleServiceEnabled('openrouter', this.checked)"
+                />
+                <span class="service-enable-slider"></span>
+              </label>
             </div>
             <div class="service-config-fields">
               <div class="key-input-wrap">
@@ -667,6 +680,7 @@
                   class="key-input"
                   autocomplete="off"
                   spellcheck="false"
+                  oninput="onApiKeyInput('openrouter')"
                 />
                 <button
                   class="key-toggle-btn"
@@ -687,6 +701,13 @@
                   </svg>
                 </button>
                 <button
+                  class="key-copy-btn"
+                  onclick="copyApiKey('openrouter')"
+                  title="Copiar API key"
+                >
+                  ⧉
+                </button>
+                <button
                   class="key-clear-btn"
                   onclick="clearKey('openrouter')"
                   title="Eliminar clave"
@@ -695,23 +716,9 @@
                 </button>
               </div>
               <div class="model-row">
-                <input
-                  type="text"
-                  id="model-openrouter"
-                  placeholder="openrouter/auto"
-                  class="model-input"
-                  list="openrouter-models"
-                  value="openrouter/auto"
-                />
-                <datalist id="openrouter-models">
-                  <option value="openrouter/auto" />
-                  <option value="google/gemini-2.0-flash-exp:free" />
-                  <option value="meta-llama/llama-3.3-70b-instruct:free" />
-                  <option value="deepseek/deepseek-r1:free" />
-                  <option value="microsoft/phi-4:free" />
-                  <option value="qwen/qwq-32b:free" />
-                  <option value="google/gemma-3-27b-it:free" />
-                </datalist>
+                <select id="model-openrouter" class="model-input" disabled>
+                  <option value="">Escribe API key para cargar modelos</option>
+                </select>
                 <button
                   class="load-models-btn"
                   id="load-models-openrouter"

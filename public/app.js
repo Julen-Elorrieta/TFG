@@ -17,6 +17,11 @@ const HIGHLIGHT_THEMES = {
   light:
     "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css",
 };
+const modelLoadTimers = {};
+const lastAutoLoadedKeys = {};
+const loadedModelCache = {};
+const blockedServices = {};
+const MODELS_CACHE_KEY = "neuralchat_models_cache_v1";
 
 let state = {
   conversations: {},
@@ -27,9 +32,9 @@ let state = {
   abortController: null,
   searchQuery: "",
   apiKeys: {
-    groq: { key: "", model: DEFAULT_MODELS.groq },
-    cerebras: { key: "", model: DEFAULT_MODELS.cerebras },
-    openrouter: { key: "", model: DEFAULT_MODELS.openrouter },
+    groq: { key: "", model: DEFAULT_MODELS.groq, enabled: true },
+    cerebras: { key: "", model: DEFAULT_MODELS.cerebras, enabled: true },
+    openrouter: { key: "", model: DEFAULT_MODELS.openrouter, enabled: true },
   },
 };
 
@@ -56,6 +61,38 @@ function init() {
   if (!state.currentId) newConversation();
   else renderMessages();
   updateInputState();
+}
+
+function persistModelsCache() {
+  try {
+    localStorage.setItem(MODELS_CACHE_KEY, JSON.stringify(loadedModelCache));
+  } catch (error) {
+    console.warn("Models cache save failed", error);
+  }
+}
+
+function loadModelsCacheFromStorage() {
+  try {
+    const raw = localStorage.getItem(MODELS_CACHE_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    SERVICES.forEach((svc) => {
+      const entry = parsed?.[svc];
+      if (
+        entry &&
+        typeof entry === "object" &&
+        typeof entry.key === "string" &&
+        Array.isArray(entry.models)
+      ) {
+        loadedModelCache[svc] = {
+          key: entry.key,
+          models: entry.models.filter((m) => typeof m === "string"),
+        };
+      }
+    });
+  } catch (error) {
+    console.warn("Models cache load failed", error);
+  }
 }
 
 function updateSidebarKeysIndicator() {
@@ -108,9 +145,13 @@ function loadFromStorage() {
       Object.keys(saved.apiKeys).forEach((k) => {
         if (state.apiKeys[k]) {
           state.apiKeys[k] = { ...state.apiKeys[k], ...saved.apiKeys[k] };
+          if (typeof state.apiKeys[k].enabled !== "boolean") {
+            state.apiKeys[k].enabled = true;
+          }
         }
       });
     }
+    loadModelsCacheFromStorage();
     updateThemeUI();
   } catch (error) {
     console.warn("Storage load failed", error);
@@ -120,20 +161,63 @@ function loadFromStorage() {
 function getApiHeaders() {
   const headers = {};
   SERVICES.forEach((svc) => {
+    if (blockedServices[svc]?.blocked) return;
     const cfg = state.apiKeys[svc];
-    if (!cfg?.key) return;
+    if (!cfg?.key || cfg.enabled === false) return;
     headers[SERVICE_HEADERS[svc].key] = cfg.key;
     headers[SERVICE_HEADERS[svc].model] = cfg.model || DEFAULT_MODELS[svc];
   });
   return headers;
 }
 
+function setServiceBlocked(svc, reason = "") {
+  blockedServices[svc] = { blocked: true, reason };
+  ensureSelectableService();
+}
+
+function clearServiceBlocked(svc) {
+  blockedServices[svc] = { blocked: false, reason: "" };
+}
+
+function ensureSelectableService() {
+  const current = state.selectedService;
+  if (current === "auto") return;
+  if (blockedServices[current]?.blocked) {
+    state.selectedService = "auto";
+    saveToStorage();
+  }
+}
+
+function inferUnusableServiceReason(message = "") {
+  const msg = String(message).toLowerCase();
+  if (
+    msg.includes("insufficient credits") ||
+    msg.includes("402") ||
+    msg.includes("quota")
+  ) {
+    return "Sin créditos";
+  }
+  if (
+    msg.includes("model_not_found") ||
+    msg.includes("does not exist") ||
+    msg.includes("not_found")
+  ) {
+    return "Modelo no disponible";
+  }
+  if (msg.includes("unauthorized") || msg.includes("invalid api key") || msg.includes("401")) {
+    return "API key inválida";
+  }
+  return "";
+}
+
 function hasAnyApiKey() {
-  return Object.values(state.apiKeys).some((s) => s.key.trim() !== "");
+  return Object.values(state.apiKeys).some(
+    (s) => s.key.trim() !== "" && s.enabled !== false,
+  );
 }
 
 const SERVICE_META = {
-  auto: { icon: "⚡", label: "Auto", sub: "Round-robin automático" },
+  auto: { icon: "⚡", label: "Rotación IA", sub: "Alterna entre IAs activas" },
   groq: { icon: "⚡", label: "Groq", sub: "Ultra-rápido" },
   cerebras: { icon: "🧠", label: "Cerebras", sub: "Alto rendimiento" },
   openrouter: { icon: "🌐", label: "OpenRouter", sub: "Múltiples modelos" },
@@ -153,6 +237,7 @@ async function loadServices() {
   } catch {
     renderServiceDropdown(DEFAULT_SERVICE_OPTIONS);
   }
+  ensureSelectableService();
   updateServiceBadge();
   updateInputState();
 }
@@ -162,7 +247,7 @@ function renderServiceDropdown(services) {
   if (!dropdown) return;
 
   dropdown.innerHTML =
-    `<div class="svc-dropdown-header">Servicio AI</div>` +
+    `<div class="svc-dropdown-header">Modo de respuesta</div>` +
     services
       .map((svc) => {
         const meta = SERVICE_META[svc] || {
@@ -205,6 +290,10 @@ function closeServiceDropdown() {
 }
 
 function selectService(val) {
+  if (val !== "auto" && blockedServices[val]?.blocked) {
+    toast(`Servicio bloqueado${blockedServices[val].reason ? `: ${blockedServices[val].reason}` : ""}`, "error");
+    return;
+  }
   state.selectedService = val;
   updateServiceBadge();
   saveToStorage();
@@ -215,7 +304,7 @@ function selectService(val) {
   });
   closeServiceDropdown();
   const label =
-    val === "auto" ? "Auto" : SERVICE_META[val]?.label || capitalize(val);
+    val === "auto" ? "Rotación IA" : SERVICE_META[val]?.label || capitalize(val);
   toast(`Servicio: ${label}`, "info");
 }
 
@@ -245,11 +334,90 @@ function populateSettingsForm() {
   SERVICES.forEach((svc) => {
     const keyEl = document.getElementById(`key-${svc}`);
     const modelEl = document.getElementById(`model-${svc}`);
-    if (keyEl) keyEl.value = state.apiKeys[svc]?.key || "";
-    if (modelEl)
-      modelEl.value = state.apiKeys[svc]?.model || DEFAULT_MODELS[svc];
+    const currentKey = keyEl?.value?.trim() || "";
+    const savedKey = state.apiKeys[svc]?.key?.trim() || "";
+    updateEnabledButton(svc);
+    const effectiveKey = currentKey || savedKey;
+    if (keyEl && !currentKey) keyEl.value = savedKey;
+    const cached = loadedModelCache[svc];
+    if (
+      effectiveKey &&
+      cached?.key === effectiveKey &&
+      Array.isArray(cached.models) &&
+      cached.models.length
+    ) {
+      setSelectOptions(
+        modelEl,
+        cached.models,
+        state.apiKeys[svc]?.model || DEFAULT_MODELS[svc],
+      );
+      return;
+    }
+    resetModelSelect(svc);
   });
   updateKeyStatuses();
+}
+
+function setSelectOptions(selectEl, models, selectedModel) {
+  if (!selectEl) return;
+  selectEl.disabled = false;
+  selectEl.innerHTML = "";
+  models.forEach((model) => {
+    const opt = document.createElement("option");
+    opt.value = model;
+    opt.textContent = model;
+    if (model === selectedModel) opt.selected = true;
+    selectEl.appendChild(opt);
+  });
+
+  if (
+    selectedModel &&
+    !models.includes(selectedModel) &&
+    typeof selectedModel === "string"
+  ) {
+    const opt = document.createElement("option");
+    opt.value = selectedModel;
+    opt.textContent = `${selectedModel} (no disponible)`;
+    opt.selected = true;
+    selectEl.appendChild(opt);
+  }
+}
+
+function resetModelSelect(svc) {
+  const modelEl = document.getElementById(`model-${svc}`);
+  if (!modelEl) return;
+  modelEl.innerHTML = '<option value="">Escribe API key para cargar modelos</option>';
+  modelEl.disabled = true;
+}
+
+function setModelSelectLoading(svc, message = "Validando modelos...") {
+  const modelEl = document.getElementById(`model-${svc}`);
+  if (!modelEl) return;
+  modelEl.innerHTML = `<option value="">${message}</option>`;
+  modelEl.disabled = true;
+}
+
+function onApiKeyInput(svc) {
+  const keyEl = document.getElementById(`key-${svc}`);
+  const key = keyEl?.value?.trim() || "";
+  if (modelLoadTimers[svc]) clearTimeout(modelLoadTimers[svc]);
+  if (!key) {
+    lastAutoLoadedKeys[svc] = "";
+    loadedModelCache[svc] = null;
+    persistModelsCache();
+    clearServiceBlocked(svc);
+    resetModelSelect(svc);
+    return;
+  }
+  if (key.length < 10) {
+    resetModelSelect(svc);
+    return;
+  }
+  modelLoadTimers[svc] = setTimeout(() => {
+    if (lastAutoLoadedKeys[svc] === key) return;
+    lastAutoLoadedKeys[svc] = key;
+    loadModelsForService(svc, { silent: true });
+  }, 500);
 }
 
 function updateKeyStatuses() {
@@ -257,9 +425,14 @@ function updateKeyStatuses() {
     const indicator = document.getElementById(`status-${svc}`);
     if (indicator) {
       const hasKey = !!state.apiKeys[svc]?.key?.trim();
+      const enabled = state.apiKeys[svc]?.enabled !== false;
       indicator.classList.remove("active", "inactive");
-      indicator.classList.add(hasKey ? "active" : "inactive");
-      indicator.title = hasKey ? "API key configured" : "No API key";
+      indicator.classList.add(hasKey && enabled ? "active" : "inactive");
+      indicator.title = hasKey
+        ? enabled
+          ? "API key configured"
+          : "Servicio deshabilitado"
+        : "No API key";
     }
   });
 }
@@ -271,7 +444,15 @@ function saveSettings() {
     if (keyEl) state.apiKeys[svc].key = keyEl.value.trim();
     if (modelEl)
       state.apiKeys[svc].model = modelEl.value.trim() || DEFAULT_MODELS[svc];
+    if (typeof state.apiKeys[svc].enabled !== "boolean") {
+      state.apiKeys[svc].enabled = true;
+    }
+    const currentKey = state.apiKeys[svc].key || "";
+    if (loadedModelCache[svc]?.key !== currentKey) {
+      loadedModelCache[svc] = null;
+    }
   });
+  persistModelsCache();
   saveToStorage();
   loadServices();
   updateKeyStatuses();
@@ -285,11 +466,51 @@ function clearKey(svc) {
   const keyEl = document.getElementById(`key-${svc}`);
   if (keyEl) keyEl.value = "";
   state.apiKeys[svc].key = "";
+  state.apiKeys[svc].model = DEFAULT_MODELS[svc];
+  state.apiKeys[svc].enabled = true;
+  lastAutoLoadedKeys[svc] = "";
+  loadedModelCache[svc] = null;
+  persistModelsCache();
+  clearServiceBlocked(svc);
+  resetModelSelect(svc);
   saveToStorage();
   updateKeyStatuses();
   updateInputState();
   loadServices();
   toast(`Clave ${capitalize(svc)} eliminada`, "info");
+}
+
+function updateEnabledButton(svc) {
+  const btn = document.getElementById(`enabled-${svc}`);
+  if (!(btn instanceof HTMLInputElement)) return;
+  const enabled = state.apiKeys[svc]?.enabled !== false;
+  btn.checked = enabled;
+}
+
+function toggleServiceEnabled(svc, checked) {
+  const enabled = !!checked;
+  state.apiKeys[svc].enabled = enabled;
+  if (!state.apiKeys[svc].enabled && state.selectedService === svc) {
+    state.selectedService = "auto";
+  }
+  updateEnabledButton(svc);
+  updateKeyStatuses();
+  saveToStorage();
+  loadServices();
+  updateInputState();
+}
+
+function copyApiKey(svc) {
+  const keyEl = document.getElementById(`key-${svc}`);
+  const key = keyEl?.value?.trim() || state.apiKeys[svc]?.key?.trim() || "";
+  if (!key) {
+    toast("No hay API key para copiar", "error");
+    return;
+  }
+  navigator.clipboard
+    .writeText(key)
+    .then(() => toast("API key copiada", "success"))
+    .catch(() => toast("No se pudo copiar la API key", "error"));
 }
 
 function toggleKeyVisibility(svc) {
@@ -303,7 +524,8 @@ function toggleKeyVisibility(svc) {
     : `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
 }
 
-async function loadModelsForService(svc) {
+async function loadModelsForService(svc, opts = {}) {
+  const { silent = false } = opts;
   const modelEl = document.getElementById(`model-${svc}`);
   const loadBtn = document.getElementById(`load-models-${svc}`);
   if (!modelEl || !loadBtn) return;
@@ -311,7 +533,7 @@ async function loadModelsForService(svc) {
   const keyEl = document.getElementById(`key-${svc}`);
   const tempKey = keyEl?.value?.trim();
   if (!tempKey && !state.apiKeys[svc]?.key) {
-    toast("Introduce una API key primero", "error");
+    if (!silent) toast("Introduce una API key primero", "error");
     return;
   }
 
@@ -321,26 +543,39 @@ async function loadModelsForService(svc) {
   }
 
   loadBtn.disabled = true;
-  loadBtn.textContent = "...";
+  loadBtn.textContent = "Validando...";
+  setModelSelectLoading(svc);
   try {
-    const res = await fetch(`${API}/models?service=${svc}`, {
+    const res = await fetch(`${API}/models?service=${svc}&validate=1`, {
       headers: tempHeaders,
     });
     const data = await res.json();
     if (data.models && data.models.length > 0) {
-      modelEl.innerHTML = "";
-      data.models.forEach((m) => {
-        const opt = document.createElement("option");
-        opt.value = m;
-        opt.textContent = m;
-        if (m === (state.apiKeys[svc]?.model || DEFAULT_MODELS[svc]))
-          opt.selected = true;
-        modelEl.appendChild(opt);
-      });
-      toast(`${data.models.length} modelos cargados`, "success");
+      clearServiceBlocked(svc);
+      loadedModelCache[svc] = {
+        key: tempKey || state.apiKeys[svc]?.key || "",
+        models: data.models,
+      };
+      persistModelsCache();
+      setSelectOptions(
+        modelEl,
+        data.models,
+        state.apiKeys[svc]?.model || DEFAULT_MODELS[svc],
+      );
+      if (!silent) toast(`${data.models.length} modelos cargados`, "success");
+    } else {
+      setServiceBlocked(svc, "Sin modelos válidos");
+      loadedModelCache[svc] = null;
+      persistModelsCache();
+      resetModelSelect(svc);
+      if (!silent) toast("No hay modelos disponibles para esta API key", "error");
     }
   } catch {
-    toast("Error cargando modelos", "error");
+    setServiceBlocked(svc, "Error de validación");
+    loadedModelCache[svc] = null;
+    persistModelsCache();
+    setModelSelectLoading(svc, "Error validando modelos");
+    if (!silent) toast("Error cargando modelos", "error");
   } finally {
     loadBtn.disabled = false;
     loadBtn.textContent = "Cargar";
@@ -348,10 +583,8 @@ async function loadModelsForService(svc) {
 }
 
 function updateServiceBadge() {
-  const badge = document.getElementById("current-service-badge");
   const label = document.getElementById("service-label");
   const val = state.selectedService;
-  if (badge) badge.textContent = val.toUpperCase();
   if (label) {
     const meta = SERVICE_META?.[val];
     label.textContent = meta ? meta.label : capitalize(val);
@@ -612,20 +845,11 @@ function renderMessageRow(msg, idx) {
       <div class="msg-content">${displayContent}</div>
     </div>
     <div class="msg-actions">
-      <button class="msg-action-btn" onclick="copyMessage(${idx})" title="Copiar">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
-        Copiar
-      </button>
+      <button class="msg-action-btn icon-only" onclick="copyMessage(${idx})" title="Copiar">⧉</button>
       ${
         isUser
-          ? `<button class="msg-action-btn" onclick="editMessage(${idx})" title="Editar">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-            Editar
-          </button>`
-          : `<button class="msg-action-btn" onclick="regenerateFrom(${idx})" title="Regenerar">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
-            Regenerar
-          </button>`
+          ? `<button class="msg-action-btn icon-only" onclick="editMessage(${idx})" title="Editar">✎</button>`
+          : `<button class="msg-action-btn icon-only" onclick="regenerateFrom(${idx})" title="Regenerar">↻</button>`
       }
     </div>
   </div>`;
@@ -802,6 +1026,19 @@ async function streamResponse(conv, retryCount = 0) {
   let fullContent = "";
   let usedService = "";
   let usedModel = "";
+  const requestedService =
+    state.selectedService === "auto" ? null : state.selectedService;
+
+  if (requestedService && blockedServices[requestedService]?.blocked) {
+    removeTypingIndicator(typingId);
+    const reason = blockedServices[requestedService].reason;
+    toast(
+      `Ese servicio está bloqueado${reason ? ` (${reason})` : ""}. Vuelve a cargar modelos.`,
+      "error",
+    );
+    setStreaming(false);
+    return;
+  }
 
   try {
     state.abortController = new AbortController();
@@ -823,6 +1060,13 @@ async function streamResponse(conv, retryCount = 0) {
       const errData = await res
         .json()
         .catch(() => ({ error: `HTTP ${res.status}` }));
+      if (errData?.service) {
+        const svc = String(errData.service).toLowerCase();
+        if (SERVICES.includes(svc)) {
+          const reason = inferUnusableServiceReason(errData.error || "");
+          setServiceBlocked(svc, reason);
+        }
+      }
       throw new Error(errData.error || `HTTP ${res.status}`);
     }
 
@@ -923,6 +1167,8 @@ async function streamResponse(conv, retryCount = 0) {
       return streamResponse(conv, retryCount + 1);
     } else {
       const msg = getErrorMessage(err);
+      const reason = inferUnusableServiceReason(msg);
+      if (requestedService && reason) setServiceBlocked(requestedService, reason);
       toast("Error: " + msg, "error");
       const lastMsg = conv.messages[conv.messages.length - 1];
       if (lastMsg?.role === "assistant") conv.messages.pop();
