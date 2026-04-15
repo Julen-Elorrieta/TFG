@@ -1,4 +1,16 @@
 import type { AIService } from "../types/ai";
+import { join } from "node:path";
+
+function resolvePublicFile(filename: string): string {
+  const dir = import.meta.dir.replace(/\\/g, "/").toLowerCase();
+  if (dir.endsWith("/src/config")) {
+    return join(import.meta.dir, "../../public", filename);
+  }
+  if (dir.endsWith("/dist")) {
+    return join(import.meta.dir, "../public", filename);
+  }
+  return join(process.cwd(), "public", filename);
+}
 
 export const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,9 +20,9 @@ export const corsHeaders = {
 };
 
 export const staticFiles = {
-  html: Bun.file(import.meta.dir + "/../../public/index.html"),
-  css: Bun.file(import.meta.dir + "/../../public/style.css"),
-  js: Bun.file(import.meta.dir + "/../../public/app.js"),
+  html: Bun.file(resolvePublicFile("index.html")),
+  css: Bun.file(resolvePublicFile("style.css")),
+  js: Bun.file(resolvePublicFile("app.js")),
 };
 
 let rrIndex = 0;
