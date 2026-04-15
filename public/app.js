@@ -17,15 +17,20 @@ let state = {
   pendingFiles: [],
   streaming: false,
   abortController: null,
-  sidebarOpen: true,
   searchQuery: "",
   // API keys & models (stored in localStorage, sent as headers)
   apiKeys: {
-    groq: { key: "", model: DEFAULT_MODELS.groq, enabled: false },
-    cerebras: { key: "", model: DEFAULT_MODELS.cerebras, enabled: false },
-    openrouter: { key: "", model: DEFAULT_MODELS.openrouter, enabled: false },
+    groq: { key: "", model: DEFAULT_MODELS.groq },
+    cerebras: { key: "", model: DEFAULT_MODELS.cerebras },
+    openrouter: { key: "", model: DEFAULT_MODELS.openrouter },
   },
 };
+
+function getErrorMessage(error, fallback = "Error desconocido") {
+  if (error instanceof Error && error.message) return error.message;
+  if (typeof error === "string" && error.trim()) return error;
+  return fallback;
+}
 
 // ── Init ─────────────────────────────────────────────
 function init() {
@@ -61,7 +66,7 @@ function saveToStorage() {
       apiKeys: state.apiKeys,
     };
     localStorage.setItem("neuralchat_v2", JSON.stringify(toSave));
-  } catch (e) {
+  } catch {
     console.warn("Storage save failed", e);
   }
 }
@@ -99,7 +104,7 @@ function loadFromStorage() {
       });
     }
     updateThemeUI();
-  } catch (e) {
+  } catch {
     console.warn("Storage load failed", e);
   }
 }
@@ -149,7 +154,7 @@ async function loadServices() {
           ? []
           : ["auto", "groq", "cerebras", "openrouter"];
     renderServiceDropdown(services);
-  } catch (e) {
+  } catch {
     renderServiceDropdown(["auto", "groq", "cerebras", "openrouter"]);
   }
   updateServiceBadge();
@@ -170,7 +175,7 @@ function renderServiceDropdown(services) {
           sub: "",
         };
         const isActive = state.selectedService === svc;
-        return `<button class="svc-option${isActive ? " active" : ""}" onclick="selectService('${svc}')">
+        return `<button class="svc-option${isActive ? " active" : ""}" onclick="selectService('${svc}')" data-service="${svc}">
         <span class="svc-option-icon">${meta.icon}</span>
         <div class="svc-option-info">
           <div class="svc-option-name">${meta.label}</div>
@@ -210,8 +215,8 @@ function selectService(val) {
   saveToStorage();
   // Update active classes without full re-render
   document.querySelectorAll(".svc-option").forEach((el) => {
-    const onclick = el.getAttribute("onclick") || "";
-    el.classList.toggle("active", onclick.includes(`'${val}'`));
+    const svcVal = el.getAttribute("data-service") || "";
+    el.classList.toggle("active", svcVal === val);
   });
   closeServiceDropdown();
   const label =
@@ -258,8 +263,8 @@ function updateKeyStatuses() {
     const indicator = document.getElementById(`status-${svc}`);
     if (indicator) {
       const hasKey = !!state.apiKeys[svc]?.key?.trim();
-      indicator.className =
-        "key-status-dot " + (hasKey ? "active" : "inactive");
+      indicator.classList.remove("active", "inactive");
+      indicator.classList.add(hasKey ? "active" : "inactive");
       indicator.title = hasKey ? "API key configured" : "No API key";
     }
   });
@@ -272,7 +277,6 @@ function saveSettings() {
     if (keyEl) state.apiKeys[svc].key = keyEl.value.trim();
     if (modelEl)
       state.apiKeys[svc].model = modelEl.value.trim() || DEFAULT_MODELS[svc];
-    state.apiKeys[svc].enabled = !!state.apiKeys[svc].key;
   });
   saveToStorage();
   loadServices();
@@ -287,7 +291,6 @@ function clearKey(svc) {
   const keyEl = document.getElementById(`key-${svc}`);
   if (keyEl) keyEl.value = "";
   state.apiKeys[svc].key = "";
-  state.apiKeys[svc].enabled = false;
   saveToStorage();
   updateKeyStatuses();
   updateInputState();
@@ -345,20 +348,12 @@ async function loadModelsForService(svc) {
       });
       toast(`${data.models.length} modelos cargados`, "success");
     }
-  } catch (e) {
+  } catch {
     toast("Error cargando modelos", "error");
   } finally {
     loadBtn.disabled = false;
     loadBtn.textContent = "Cargar";
   }
-}
-
-// ═══════════════════════════════════════════════════════
-//  SERVICES
-// ═══════════════════════════════════════════════════════
-// Legacy alias (kept for safety)
-function onServiceChange(val) {
-  selectService(val);
 }
 
 function updateServiceBadge() {
@@ -694,6 +689,7 @@ function renderMarkdown(text) {
   if (!text) return "";
   try {
     const html = marked.parse(text, { breaks: true, gfm: true });
+    if (!html.includes("<pre><code")) return html;
     return html
       .replace(
         /<pre><code class="language-([^"]+)">([\s\S]*?)<\/code><\/pre>/g,
@@ -722,7 +718,7 @@ function renderMarkdown(text) {
           <pre><code>${code}</code></pre>
         </div>`;
       });
-  } catch (e) {
+  } catch {
     return escHtml(text);
   }
 }
@@ -739,7 +735,7 @@ function applyHighlighting() {
 function scrollToBottom(smooth = true) {
   const c = document.getElementById("messages-container");
   if (!c) return;
-  c.scrollTo({ top: c.scrollHeight, behavior: smooth ? "smooth" : "instant" });
+  c.scrollTo({ top: c.scrollHeight, behavior: smooth ? "smooth" : "auto" });
 }
 
 // ═══════════════════════════════════════════════════════
@@ -773,7 +769,7 @@ async function sendMessage() {
       preview: f.displayType === "image" ? f.content : null,
       fileContent:
         f.displayType === "text"
-          ? truncateFileContent(f.content, f.name)
+          ? truncateFileContent(f.content)
           : null,
     })),
   };
@@ -793,7 +789,7 @@ async function sendMessage() {
 
 const MAX_FILE_CHARS = 8000;
 
-function truncateFileContent(text, filename) {
+function truncateFileContent(text) {
   if (!text) return "";
   if (text.length <= MAX_FILE_CHARS) return text;
   const half = Math.floor(MAX_FILE_CHARS / 2);
@@ -879,7 +875,6 @@ async function streamResponse(conv, retryCount = 0) {
     const reader = res.body.getReader();
     const dec = new TextDecoder();
     let buffer = "";
-    let tokenCount = 0;
 
     while (true) {
       const { done, value } = await reader.read();
@@ -901,7 +896,6 @@ async function streamResponse(conv, retryCount = 0) {
           }
           if (parsed.content) {
             fullContent += parsed.content;
-            tokenCount += parsed.content.split(/\s+/).length;
             assistantMsg.content = fullContent;
             assistantMsg.service = usedService;
             assistantMsg.model = usedModel;
@@ -912,8 +906,9 @@ async function streamResponse(conv, retryCount = 0) {
             scrollToBottom(false);
           }
           if (parsed.error) throw new Error(parsed.error);
-        } catch (e) {
-          if (e.message && !e.message.includes("JSON")) throw e;
+        } catch (error) {
+          const message = getErrorMessage(error, "");
+          if (message && !message.includes("JSON")) throw error;
         }
       }
     }
@@ -942,19 +937,23 @@ async function streamResponse(conv, retryCount = 0) {
     triggerNotification(usedService);
   } catch (err) {
     removeTypingIndicator(typingId);
-    if (err.name === "AbortError") {
+    if (err instanceof Error && err.name === "AbortError") {
       toast("Respuesta cancelada", "info");
       const lastMsg = conv.messages[conv.messages.length - 1];
       if (lastMsg?.role === "assistant" && !lastMsg.content)
         conv.messages.pop();
-    } else if (retryCount < 1 && err.message?.includes("fetch")) {
+    } else if (
+      retryCount < 1 &&
+      err instanceof Error &&
+      err.message.includes("fetch")
+    ) {
       // Auto-retry once on network error
       toast("Reintentando conexión...", "info");
       setStreaming(false);
       await new Promise((r) => setTimeout(r, 1500));
       return streamResponse(conv, retryCount + 1);
     } else {
-      const msg = err.message || "Error desconocido";
+      const msg = getErrorMessage(err);
       toast("Error: " + msg, "error");
       const lastMsg = conv.messages[conv.messages.length - 1];
       if (lastMsg?.role === "assistant") conv.messages.pop();
@@ -1120,9 +1119,9 @@ async function processFile(file) {
     renderFilePreviews();
     removeToast(toastId);
     toast(`${data.filename} listo ✓`, "success");
-  } catch (e) {
+  } catch (error) {
     removeToast(toastId);
-    toast(`Error: ${e.message}`, "error");
+    toast(`Error: ${getErrorMessage(error)}`, "error");
   }
 }
 
@@ -1501,7 +1500,6 @@ function toggleSidebar() {
     const sidebar = document.getElementById("sidebar");
     if (!sidebar) return;
     sidebar.classList.toggle("collapsed");
-    state.sidebarOpen = !sidebar.classList.contains("collapsed");
   }
 }
 

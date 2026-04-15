@@ -1,5 +1,18 @@
 import { corsHeaders } from "../config/constants";
 
+function extractModelIds(models: unknown): string[] {
+  if (!models || typeof models !== "object") return [];
+  const data = (models as { data?: unknown }).data;
+  if (!Array.isArray(data)) return [];
+  return data
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const id = (item as { id?: unknown }).id;
+      return typeof id === "string" ? id : null;
+    })
+    .filter((id): id is string => id !== null);
+}
+
 export async function handleModelsRoute(req: Request): Promise<Response> {
   const url = new URL(req.url);
   const service = url.searchParams.get("service");
@@ -11,7 +24,7 @@ export async function handleModelsRoute(req: Request): Promise<Response> {
       const Cerebras = (await import("@cerebras/cerebras_cloud_sdk")).default;
       const cerebras = new Cerebras({ apiKey: cerebrasKey });
       const models = await cerebras.models.list();
-      const ids = (models as any).data?.map((m: any) => m.id) ?? [];
+      const ids = extractModelIds(models);
       return new Response(JSON.stringify({ models: ids }), {
         headers: { "Content-Type": "application/json", ...corsHeaders },
       });

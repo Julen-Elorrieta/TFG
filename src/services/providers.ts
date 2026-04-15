@@ -1,5 +1,20 @@
 import type { AIService, ChatMessage } from "../types/ai";
 
+type DeltaChunk = {
+  choices?: Array<{
+    delta?: {
+      content?: string | null;
+    };
+  }>;
+};
+
+function toDeltaContent(chunk: unknown): string {
+  if (!chunk || typeof chunk !== "object") return "";
+  const choices = (chunk as DeltaChunk).choices;
+  const content = choices?.[0]?.delta?.content;
+  return typeof content === "string" ? content : "";
+}
+
 export async function createGroqService(
   apiKey: string,
   model: string,
@@ -39,7 +54,7 @@ export async function createCerebrasService(
       const Cerebras = (await import("@cerebras/cerebras_cloud_sdk")).default;
       const cerebras = new Cerebras({ apiKey });
       const stream = await cerebras.chat.completions.create({
-        messages: messages as any,
+        messages,
         model,
         stream: true,
         max_completion_tokens: 8192,
@@ -48,7 +63,7 @@ export async function createCerebrasService(
       });
       return (async function* () {
         for await (const chunk of stream) {
-          yield (chunk as any).choices[0]?.delta?.content || "";
+          yield toDeltaContent(chunk);
         }
       })();
     },
@@ -75,7 +90,7 @@ export async function createOpenRouterService(
 
       const stream = await client.chat.completions.create({
         model,
-        messages: messages as any,
+        messages,
         stream: true,
         temperature: 0.6,
         max_tokens: 8192,

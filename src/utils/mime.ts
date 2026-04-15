@@ -28,7 +28,6 @@ const MIME_TYPE_MAP: Record<string, string> = {
   toml: "text/x-toml",
   xml: "text/xml",
   sql: "text/x-sql",
-  dockerfile: "text/plain",
 };
 
 export function getMimeType(filename: string): string {

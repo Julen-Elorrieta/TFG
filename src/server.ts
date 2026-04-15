@@ -70,9 +70,10 @@ const server = Bun.serve({
       }
 
       return new Response("Not found", { status: 404, headers: corsHeaders });
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
       console.error(`[ERROR] ${req.method} ${req.url}\n`, err);
-      return new Response(JSON.stringify({ error: err?.message ?? String(err) }), {
+      return new Response(JSON.stringify({ error: errorMessage }), {
         status: 500,
         headers: { "Content-Type": "application/json", ...corsHeaders },
       });
