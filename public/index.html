@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="es" data-theme="dark">
   <head>
-    <meta charset="UTF-8" />
+    <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>NeuralChat</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -18,7 +18,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
   </head>
-
   <body>
     <div id="app">
       <!-- ══════════════ SIDEBAR ══════════════ -->
@@ -815,45 +814,45 @@
           <div style="display: flex; flex-direction: column; gap: 6px">
             <button class="export-option" onclick="applyTemplate('python')">
               <span class="export-option-icon">🐍</span>
-              <div class="export-option-info">
-                <div class="tpl-title">Experto Python</div>
-                <div class="tpl-sub">Código limpio y documentado</div>
-              </div>
+              <span class="export-option-info">
+                <span class="tpl-title">Experto Python</span>
+                <span class="tpl-sub">Código limpio y documentado</span>
+              </span>
             </button>
             <button class="export-option" onclick="applyTemplate('coder')">
               <span class="export-option-icon">💻</span>
-              <div class="export-option-info">
-                <div class="tpl-title">Ingeniero Senior</div>
-                <div class="tpl-sub">Código production-ready</div>
-              </div>
+              <span class="export-option-info">
+                <span class="tpl-title">Ingeniero Senior</span>
+                <span class="tpl-sub">Código production-ready</span>
+              </span>
             </button>
             <button class="export-option" onclick="applyTemplate('translator')">
               <span class="export-option-icon">🌐</span>
-              <div class="export-option-info">
-                <div class="tpl-title">Traductor</div>
-                <div class="tpl-sub">Traducción precisa y natural</div>
-              </div>
+              <span class="export-option-info">
+                <span class="tpl-title">Traductor</span>
+                <span class="tpl-sub">Traducción precisa y natural</span>
+              </span>
             </button>
             <button class="export-option" onclick="applyTemplate('analyst')">
               <span class="export-option-icon">📊</span>
-              <div class="export-option-info">
-                <div class="tpl-title">Analista de datos</div>
-                <div class="tpl-sub">Análisis estructurado</div>
-              </div>
+              <span class="export-option-info">
+                <span class="tpl-title">Analista de datos</span>
+                <span class="tpl-sub">Análisis estructurado</span>
+              </span>
             </button>
             <button class="export-option" onclick="applyTemplate('teacher')">
               <span class="export-option-icon">🎓</span>
-              <div class="export-option-info">
-                <div class="tpl-title">Profesor</div>
-                <div class="tpl-sub">Explicaciones claras</div>
-              </div>
+              <span class="export-option-info">
+                <span class="tpl-title">Profesor</span>
+                <span class="tpl-sub">Explicaciones claras</span>
+              </span>
             </button>
             <button class="export-option" onclick="applyTemplate('writer')">
               <span class="export-option-icon">✍️</span>
-              <div class="export-option-info">
-                <div class="tpl-title">Escritor creativo</div>
-                <div class="tpl-sub">Prosa elegante y creativa</div>
-              </div>
+              <span class="export-option-info">
+                <span class="tpl-title">Escritor creativo</span>
+                <span class="tpl-sub">Prosa elegante y creativa</span>
+              </span>
             </button>
           </div>
         </div>
@@ -903,7 +902,7 @@
         </div>
         <div class="export-options">
           <button class="export-option" onclick="exportAs('markdown')">
-            <div class="export-option-icon-wrap export-icon-md">
+            <span class="export-option-icon-wrap export-icon-md">
               <svg
                 width="18"
                 height="18"
@@ -920,15 +919,15 @@
                 <line x1="16" y1="17" x2="8" y2="17" />
                 <polyline points="10 9 9 9 8 9" />
               </svg>
-            </div>
-            <div class="export-option-info">
-              <div class="export-option-name">
+            </span>
+            <span class="export-option-info">
+              <span class="export-option-name">
                 Markdown <span class="export-option-ext">.md</span>
-              </div>
-              <div class="export-option-desc">
+              </span>
+              <span class="export-option-desc">
                 Texto con formato, tablas y bloques de código
-              </div>
-            </div>
+              </span>
+            </span>
             <svg
               class="export-option-arrow"
               width="14"
@@ -943,7 +942,7 @@
           </button>
 
           <button class="export-option" onclick="exportAs('json')">
-            <div class="export-option-icon-wrap export-icon-json">
+            <span class="export-option-icon-wrap export-icon-json">
               <svg
                 width="18"
                 height="18"
@@ -955,15 +954,15 @@
                 <polyline points="16 18 22 12 16 6" />
                 <polyline points="8 6 2 12 8 18" />
               </svg>
-            </div>
-            <div class="export-option-info">
-              <div class="export-option-name">
+            </span>
+            <span class="export-option-info">
+              <span class="export-option-name">
                 JSON <span class="export-option-ext">.json</span>
-              </div>
-              <div class="export-option-desc">
+              </span>
+              <span class="export-option-desc">
                 Datos estructurados, servicios y metadatos
-              </div>
-            </div>
+              </span>
+            </span>
             <svg
               class="export-option-arrow"
               width="14"
@@ -978,7 +977,7 @@
           </button>
 
           <button class="export-option" onclick="exportAs('txt')">
-            <div class="export-option-icon-wrap export-icon-txt">
+            <span class="export-option-icon-wrap export-icon-txt">
               <svg
                 width="18"
                 height="18"
@@ -995,15 +994,15 @@
                 <line x1="8" y1="17" x2="16" y2="17" />
                 <line x1="8" y1="9" x2="11" y2="9" />
               </svg>
-            </div>
-            <div class="export-option-info">
-              <div class="export-option-name">
+            </span>
+            <span class="export-option-info">
+              <span class="export-option-name">
                 Texto plano <span class="export-option-ext">.txt</span>
-              </div>
-              <div class="export-option-desc">
+              </span>
+              <span class="export-option-desc">
                 Sin formato, solo el contenido del chat
-              </div>
-            </div>
+              </span>
+            </span>
             <svg
               class="export-option-arrow"
               width="14"

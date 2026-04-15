@@ -3,18 +3,18 @@
   --font-display: "Syne", sans-serif;
   --font-mono: "JetBrains Mono", monospace;
 
-  --bg-base: #09090e;
-  --bg-surface: #0f0f18;
-  --bg-elevated: #181825;
-  --bg-hover: #1d1d2e;
-  --bg-active: #242436;
-  --border: rgba(255, 255, 255, 0.06);
-  --border-strong: rgba(255, 255, 255, 0.11);
+  --bg-base: #0a0d14;
+  --bg-surface: #0f1420;
+  --bg-elevated: #171d2c;
+  --bg-hover: #20283a;
+  --bg-active: #283248;
+  --border: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.14);
   --border-focus: rgba(124, 106, 247, 0.5);
 
-  --text-primary: #eaeaf5;
-  --text-secondary: #8888aa;
-  --text-muted: #50506a;
+  --text-primary: #e9eefc;
+  --text-secondary: #a2adcb;
+  --text-muted: #677395;
   --text-inverse: #09090e;
 
   --accent: #7c6af7;
@@ -34,18 +34,19 @@
   --user-border: rgba(124, 106, 247, 0.25);
   --assistant-bg: #111118;
 
-  --shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.5);
-  --shadow-md: 0 4px 20px rgba(0, 0, 0, 0.55);
-  --shadow-lg: 0 8px 40px rgba(0, 0, 0, 0.7);
+  --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.18);
+  --shadow-md: 0 10px 30px rgba(0, 0, 0, 0.28);
+  --shadow-lg: 0 20px 56px rgba(0, 0, 0, 0.38);
   --shadow-accent: 0 0 24px rgba(124, 106, 247, 0.18);
 
-  --sidebar-w: 272px;
-  --header-h: 54px;
-  --radius: 12px;
-  --radius-sm: 8px;
-  --radius-lg: 16px;
-  --transition: 0.16s cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-slow: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --sidebar-w: 286px;
+  --header-h: 58px;
+  --radius: 14px;
+  --radius-sm: 10px;
+  --radius-lg: 18px;
+  --transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 0.34s cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-smooth: cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
 [data-theme="light"] {
@@ -95,10 +96,21 @@ body {
 
 body {
   font-family: var(--font-ui);
-  background: var(--bg-base);
+  background:
+    radial-gradient(
+      1200px 600px at -10% -20%,
+      rgba(124, 106, 247, 0.1),
+      transparent 60%
+    ),
+    radial-gradient(
+      900px 500px at 110% 0%,
+      rgba(96, 165, 250, 0.08),
+      transparent 55%
+    ),
+    var(--bg-base);
   color: var(--text-primary);
-  font-size: 15px;
-  line-height: 1.65;
+  font-size: 14.5px;
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -150,8 +162,8 @@ a:hover {
 
 #sidebar {
   width: var(--sidebar-w);
-  background: var(--bg-surface);
-  border-right: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg-surface) 92%, transparent);
+  border-right: 1px solid var(--border-strong);
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
@@ -160,6 +172,7 @@ a:hover {
     width var(--transition-slow);
   z-index: 100;
   overflow: hidden;
+  backdrop-filter: blur(10px);
 }
 
 #sidebar.collapsed {
@@ -170,8 +183,8 @@ a:hover {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 15px 15px 11px;
-  border-bottom: 1px solid var(--border);
+  padding: 16px 16px 12px;
+  border-bottom: 1px solid var(--border-strong);
   flex-shrink: 0;
 }
 
@@ -203,8 +216,8 @@ a:hover {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 10px 10px 8px;
-  padding: 8px 14px;
+  margin: 12px 12px 10px;
+  padding: 10px 14px;
   background: var(--accent);
   color: white;
   border-radius: var(--radius-sm);
@@ -213,7 +226,7 @@ a:hover {
   font-family: var(--font-display);
   letter-spacing: 0.2px;
   transition: all var(--transition);
-  box-shadow: 0 2px 10px var(--accent-glow);
+  box-shadow: 0 6px 18px var(--accent-glow);
   flex-shrink: 0;
 }
 
@@ -224,7 +237,7 @@ a:hover {
 }
 
 .conv-search-wrap {
-  margin: 0 10px 6px;
+  margin: 0 12px 8px;
   position: relative;
   display: flex;
   align-items: center;
@@ -243,7 +256,7 @@ a:hover {
   padding: 7px 28px 7px 28px;
   background: var(--bg-elevated);
   border: 1px solid var(--border);
-  border-radius: 7px;
+  border-radius: 10px;
   color: var(--text-primary);
   font-size: 12.5px;
   outline: none;
@@ -296,12 +309,17 @@ a:hover {
   padding: 7px 9px;
   border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: background var(--transition);
+  transition:
+    background var(--transition),
+    transform 0.28s var(--ease-smooth),
+    box-shadow 0.28s var(--ease-smooth);
   position: relative;
 }
 
 .conv-item:hover {
   background: var(--bg-hover);
+  transform: translateX(2px);
+  box-shadow: var(--shadow-sm);
 }
 
 .conv-item.active {
@@ -456,10 +474,11 @@ a:hover {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 0 14px;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-surface);
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border-strong);
+  background: color-mix(in srgb, var(--bg-surface) 90%, transparent);
   flex-shrink: 0;
+  backdrop-filter: blur(10px);
 }
 
 #btn-sidebar-toggle {
@@ -507,9 +526,9 @@ a:hover {
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  padding: 5px 8px 5px 10px;
+  padding: 6px 9px 6px 11px;
   color: var(--text-secondary);
-  font-size: 12.5px;
+  font-size: 12px;
   font-family: var(--font-ui);
   cursor: pointer;
   transition: all var(--transition);
@@ -566,8 +585,8 @@ a:hover {
   transform-origin: top right;
   pointer-events: none;
   transition:
-    opacity 0.15s ease,
-    transform 0.15s ease;
+    opacity 0.22s var(--ease-smooth),
+    transform 0.22s var(--ease-smooth);
 }
 
 .svc-dropdown.open {
@@ -671,9 +690,9 @@ a:hover {
 }
 
 .icon-btn {
-  width: 30px;
-  height: 30px;
-  border-radius: 6px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -740,9 +759,9 @@ a:hover {
 }
 
 #messages-inner {
-  max-width: 780px;
+  max-width: 860px;
   margin: 0 auto;
-  padding: 24px 20px 16px;
+  padding: 28px 22px 18px;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -753,6 +772,8 @@ a:hover {
   flex-direction: column;
   gap: 4px;
   padding: 4px 0;
+  animation: messageIn 0.28s var(--ease-smooth);
+  transform-origin: 50% 100%;
 }
 
 .msg-label {
@@ -793,25 +814,47 @@ a:hover {
 
 .msg-bubble {
   border-radius: var(--radius);
-  padding: 12px 16px;
+  padding: 14px 18px;
   max-width: 100%;
   position: relative;
-  transition: all var(--transition);
+  transition:
+    transform 0.28s var(--ease-smooth),
+    box-shadow 0.28s var(--ease-smooth),
+    border-color 0.28s var(--ease-smooth),
+    background-color 0.28s var(--ease-smooth);
+  box-shadow: var(--shadow-sm);
 }
 
 .msg-row.user .msg-bubble {
-  background: var(--user-bg);
-  border: 1px solid var(--user-border);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--user-bg) 96%, white 4%),
+    var(--user-bg)
+  );
+  border: 1px solid color-mix(in srgb, var(--user-border) 86%, white 14%);
   align-self: flex-end;
-  max-width: 82%;
+  max-width: 80%;
   border-bottom-right-radius: 4px;
 }
 
+.msg-row.user .msg-bubble:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
 .msg-row.assistant .msg-bubble {
-  background: var(--assistant-bg);
-  border: 1px solid var(--border);
+  background: color-mix(
+    in srgb,
+    var(--assistant-bg) 92%,
+    var(--bg-elevated) 8%
+  );
+  border: 1px solid var(--border-strong);
   max-width: 100%;
   border-bottom-left-radius: 4px;
+}
+
+.msg-row.assistant .msg-bubble:hover {
+  transform: translateY(-1px);
 }
 
 .msg-row.user .msg-label {
@@ -945,10 +988,10 @@ a:hover {
   transform: translateY(4px) scale(0.98);
   pointer-events: none;
   transition:
-    opacity 0.18s ease 0.5s,
-    transform 0.18s ease 0.5s,
-    border-color var(--transition),
-    box-shadow var(--transition);
+    opacity 0.24s var(--ease-smooth) 0.45s,
+    transform 0.24s var(--ease-smooth) 0.45s,
+    border-color 0.22s var(--ease-smooth),
+    box-shadow 0.22s var(--ease-smooth);
   margin-top: 2px;
   margin-bottom: 4px;
 }
@@ -1223,10 +1266,11 @@ a:hover {
 }
 
 #input-area {
-  padding: 10px 16px 14px;
-  background: var(--bg-base);
-  border-top: 1px solid var(--border);
+  padding: 12px 18px 16px;
+  background: color-mix(in srgb, var(--bg-base) 92%, transparent);
+  border-top: 1px solid var(--border-strong);
   flex-shrink: 0;
+  backdrop-filter: blur(8px);
 }
 
 #input-inner {
@@ -1331,17 +1375,20 @@ a:hover {
   align-items: flex-end;
   gap: 6px;
   background: var(--bg-surface);
-  border: 1px solid var(--border-strong);
+  border: 1px solid color-mix(in srgb, var(--border-strong) 85%, white 15%);
   border-radius: var(--radius);
-  padding: 8px 8px 8px 14px;
+  padding: 9px 9px 9px 14px;
+  box-shadow: var(--shadow-sm);
   transition:
-    border-color var(--transition),
-    box-shadow var(--transition);
+    border-color 0.24s var(--ease-smooth),
+    box-shadow 0.24s var(--ease-smooth),
+    transform 0.24s var(--ease-smooth);
 }
 
 .textarea-wrap:focus-within {
   border-color: var(--border-focus);
   box-shadow: 0 0 0 3px var(--accent-dim);
+  transform: translateY(-1px);
 }
 
 .textarea-wrap.drag-over {
@@ -1399,8 +1446,8 @@ a:hover {
 
 #btn-send,
 #btn-stop {
-  width: 33px;
-  height: 33px;
+  width: 35px;
+  height: 35px;
   border-radius: 8px;
   display: flex;
   align-items: center;
@@ -1412,7 +1459,7 @@ a:hover {
 #btn-send {
   background: var(--accent);
   color: white;
-  box-shadow: 0 2px 10px var(--accent-glow);
+  box-shadow: 0 6px 18px var(--accent-glow);
 }
 
 #btn-send:hover:not(:disabled) {
@@ -1724,6 +1771,8 @@ a:hover {
 }
 
 .export-option-info {
+  display: flex;
+  flex-direction: column;
   flex: 1;
   min-width: 0;
 }
@@ -1772,6 +1821,7 @@ a:hover {
   inset: 0;
   background: rgba(0, 0, 0, 0.7);
   backdrop-filter: blur(8px);
+  animation: fadeIn 0.26s var(--ease-smooth);
 }
 
 .settings-modal {
@@ -1779,12 +1829,14 @@ a:hover {
   background: var(--bg-surface);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-lg);
-  width: min(560px, calc(100vw - 24px));
+  width: min(620px, calc(100vw - 24px));
   max-height: calc(100vh - 40px);
-  box-shadow: var(--shadow-lg);
+  box-shadow:
+    var(--shadow-lg),
+    0 0 0 1px rgba(255, 255, 255, 0.03);
   display: flex;
   flex-direction: column;
-  animation: modalIn 0.22s ease-out;
+  animation: modalIn 0.3s var(--ease-smooth);
   overflow: hidden;
 }
 
@@ -1827,21 +1879,29 @@ a:hover {
 }
 
 .service-config-card {
-  background: var(--bg-elevated);
+  background: color-mix(in srgb, var(--bg-elevated) 92%, transparent);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius);
   overflow: hidden;
-  transition: border-color var(--transition);
+  transition:
+    border-color 0.24s var(--ease-smooth),
+    transform 0.24s var(--ease-smooth),
+    box-shadow 0.24s var(--ease-smooth);
 }
 
 .service-config-card:focus-within {
   border-color: var(--border-focus);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
 }
 
 .service-config-header {
   padding: 12px 14px;
   border-bottom: 1px solid var(--border);
-  background: var(--bg-hover);
+  background: color-mix(in srgb, var(--bg-hover) 88%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .service-config-name {
@@ -1881,7 +1941,7 @@ a:hover {
   align-items: center;
   gap: 4px;
   background: var(--bg-surface);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
   padding: 2px 4px 2px 10px;
   transition: border-color var(--transition);
@@ -1995,7 +2055,7 @@ a:hover {
   width: 100%;
   padding: 7px 10px;
   background: var(--bg-surface);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
   color: var(--text-primary);
   font-size: 12.5px;
@@ -2031,9 +2091,9 @@ select.model-input {
 }
 
 .load-models-btn {
-  padding: 7px 12px;
+  padding: 8px 12px;
   background: var(--bg-active);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
   color: var(--text-secondary);
   font-size: 12px;
@@ -2150,7 +2210,7 @@ select.model-input {
   font-size: 13px;
   font-weight: 500;
   box-shadow: var(--shadow-md);
-  animation: toastIn 0.2s ease-out;
+  animation: toastIn 0.3s var(--ease-smooth);
   pointer-events: all;
   display: flex;
   align-items: center;
@@ -2201,9 +2261,29 @@ select.model-input {
 @keyframes toastIn {
   from {
     opacity: 0;
-    transform: translateX(12px);
+    transform: translateX(14px) translateY(4px) scale(0.98);
   }
 
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes messageIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.995);
+  }
   to {
     opacity: 1;
     transform: none;

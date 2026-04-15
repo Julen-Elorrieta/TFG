@@ -54,7 +54,9 @@ async function mapLimit<T, R>(
         const current = index;
         index += 1;
         if (current >= items.length) break;
-        out[current] = await mapper(items[current]);
+        const item = items[current];
+        if (item === undefined) break;
+        out[current] = await mapper(item);
       }
     },
   );

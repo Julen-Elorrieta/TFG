@@ -1,5 +1,10 @@
 import type { AIService, ChatMessage } from "../types/ai";
 
+type ProviderChatMessage =
+  | { role: "system"; content: string }
+  | { role: "user"; content: string }
+  | { role: "assistant"; content: string };
+
 type DeltaChunk = {
   choices?: Array<{
     delta?: {
@@ -13,6 +18,18 @@ function toDeltaContent(chunk: unknown): string {
   const choices = (chunk as DeltaChunk).choices;
   const content = choices?.[0]?.delta?.content;
   return typeof content === "string" ? content : "";
+}
+
+function toProviderMessages(messages: ChatMessage[]): ProviderChatMessage[] {
+  return messages.map((message) => {
+    if (message.role === "system") {
+      return { role: "system", content: message.content };
+    }
+    if (message.role === "assistant") {
+      return { role: "assistant", content: message.content };
+    }
+    return { role: "user", content: message.content };
+  });
 }
 
 export async function createGroqService(
@@ -54,7 +71,7 @@ export async function createCerebrasService(
       const Cerebras = (await import("@cerebras/cerebras_cloud_sdk")).default;
       const cerebras = new Cerebras({ apiKey });
       const stream = await cerebras.chat.completions.create({
-        messages,
+        messages: toProviderMessages(messages),
         model,
         stream: true,
         max_completion_tokens: 8192,
