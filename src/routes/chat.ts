@@ -82,13 +82,10 @@ export async function handleChatRoute(req: Request): Promise<Response> {
       service: service.name.toLowerCase(),
       model: service.model,
     };
-    return new Response(
-      JSON.stringify(errorPayload),
-      {
-        status: 500,
-        headers: { "Content-Type": "application/json", ...corsHeaders },
-      },
-    );
+    return new Response(JSON.stringify(errorPayload), {
+      status: 500,
+      headers: { "Content-Type": "application/json", ...corsHeaders },
+    });
   }
 
   const readable = new ReadableStream({

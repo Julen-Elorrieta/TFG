@@ -204,7 +204,11 @@ function inferUnusableServiceReason(message = "") {
   ) {
     return "Modelo no disponible";
   }
-  if (msg.includes("unauthorized") || msg.includes("invalid api key") || msg.includes("401")) {
+  if (
+    msg.includes("unauthorized") ||
+    msg.includes("invalid api key") ||
+    msg.includes("401")
+  ) {
     return "API key inválida";
   }
   return "";
@@ -291,7 +295,10 @@ function closeServiceDropdown() {
 
 function selectService(val) {
   if (val !== "auto" && blockedServices[val]?.blocked) {
-    toast(`Servicio bloqueado${blockedServices[val].reason ? `: ${blockedServices[val].reason}` : ""}`, "error");
+    toast(
+      `Servicio bloqueado${blockedServices[val].reason ? `: ${blockedServices[val].reason}` : ""}`,
+      "error",
+    );
     return;
   }
   state.selectedService = val;
@@ -304,7 +311,9 @@ function selectService(val) {
   });
   closeServiceDropdown();
   const label =
-    val === "auto" ? "Rotación IA" : SERVICE_META[val]?.label || capitalize(val);
+    val === "auto"
+      ? "Rotación IA"
+      : SERVICE_META[val]?.label || capitalize(val);
   toast(`Servicio: ${label}`, "info");
 }
 
@@ -386,7 +395,8 @@ function setSelectOptions(selectEl, models, selectedModel) {
 function resetModelSelect(svc) {
   const modelEl = document.getElementById(`model-${svc}`);
   if (!modelEl) return;
-  modelEl.innerHTML = '<option value="">Escribe API key para cargar modelos</option>';
+  modelEl.innerHTML =
+    '<option value="">Escribe API key para cargar modelos</option>';
   modelEl.disabled = true;
 }
 
@@ -568,7 +578,8 @@ async function loadModelsForService(svc, opts = {}) {
       loadedModelCache[svc] = null;
       persistModelsCache();
       resetModelSelect(svc);
-      if (!silent) toast("No hay modelos disponibles para esta API key", "error");
+      if (!silent)
+        toast("No hay modelos disponibles para esta API key", "error");
     }
   } catch {
     setServiceBlocked(svc, "Error de validación");
@@ -1168,7 +1179,8 @@ async function streamResponse(conv, retryCount = 0) {
     } else {
       const msg = getErrorMessage(err);
       const reason = inferUnusableServiceReason(msg);
-      if (requestedService && reason) setServiceBlocked(requestedService, reason);
+      if (requestedService && reason)
+        setServiceBlocked(requestedService, reason);
       toast("Error: " + msg, "error");
       const lastMsg = conv.messages[conv.messages.length - 1];
       if (lastMsg?.role === "assistant") conv.messages.pop();

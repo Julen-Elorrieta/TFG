@@ -47,19 +47,25 @@ async function mapLimit<T, R>(
   if (items.length === 0) return [];
   const out: R[] = new Array(items.length);
   let index = 0;
-  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
-    while (true) {
-      const current = index;
-      index += 1;
-      if (current >= items.length) break;
-      out[current] = await mapper(items[current]);
-    }
-  });
+  const workers = Array.from(
+    { length: Math.min(limit, items.length) },
+    async () => {
+      while (true) {
+        const current = index;
+        index += 1;
+        if (current >= items.length) break;
+        out[current] = await mapper(items[current]);
+      }
+    },
+  );
   await Promise.all(workers);
   return out;
 }
 
-async function canUseGroqModel(apiKey: string, model: string): Promise<boolean> {
+async function canUseGroqModel(
+  apiKey: string,
+  model: string,
+): Promise<boolean> {
   const result = await runWithTimeout(async () => {
     const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
@@ -84,7 +90,10 @@ async function canUseGroqModel(apiKey: string, model: string): Promise<boolean> 
   return result === true;
 }
 
-async function canUseOpenRouterModel(apiKey: string, model: string): Promise<boolean> {
+async function canUseOpenRouterModel(
+  apiKey: string,
+  model: string,
+): Promise<boolean> {
   const result = await runWithTimeout(async () => {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
@@ -111,7 +120,10 @@ async function canUseOpenRouterModel(apiKey: string, model: string): Promise<boo
   return result === true;
 }
 
-async function canUseCerebrasModel(apiKey: string, model: string): Promise<boolean> {
+async function canUseCerebrasModel(
+  apiKey: string,
+  model: string,
+): Promise<boolean> {
   const result = await runWithTimeout(async () => {
     const Cerebras = (await import("@cerebras/cerebras_cloud_sdk")).default;
     const cerebras = new Cerebras({ apiKey });
@@ -142,7 +154,10 @@ async function filterUsableModels(
     if (service === "cerebras") {
       return { model, ok: await canUseCerebrasModel(keys.cerebrasKey, model) };
     }
-    return { model, ok: await canUseOpenRouterModel(keys.openrouterKey, model) };
+    return {
+      model,
+      ok: await canUseOpenRouterModel(keys.openrouterKey, model),
+    };
   });
   const firstPass = checks.filter((c) => c.ok).map((c) => c.model);
   if (firstPass.length === 0) return [];
@@ -155,7 +170,10 @@ async function filterUsableModels(
     if (service === "cerebras") {
       return { model, ok: await canUseCerebrasModel(keys.cerebrasKey, model) };
     }
-    return { model, ok: await canUseOpenRouterModel(keys.openrouterKey, model) };
+    return {
+      model,
+      ok: await canUseOpenRouterModel(keys.openrouterKey, model),
+    };
   });
   return strictChecks.filter((c) => c.ok).map((c) => c.model);
 }
@@ -164,7 +182,8 @@ export async function handleModelsRoute(req: Request): Promise<Response> {
   const url = new URL(req.url);
   const service = url.searchParams.get("service");
   const validate = url.searchParams.get("validate") === "1";
-  const groqKey = req.headers.get("X-Groq-Key") || process.env.GROQ_API_KEY || "";
+  const groqKey =
+    req.headers.get("X-Groq-Key") || process.env.GROQ_API_KEY || "";
   const cerebrasKey =
     req.headers.get("X-Cerebras-Key") || process.env.CEREBRAS_API_KEY || "";
   const openrouterKey =
@@ -172,9 +191,12 @@ export async function handleModelsRoute(req: Request): Promise<Response> {
 
   if (service === "groq" && groqKey) {
     try {
-      const listed = await fetchModelIds("https://api.groq.com/openai/v1/models", {
-        Authorization: `Bearer ${groqKey}`,
-      });
+      const listed = await fetchModelIds(
+        "https://api.groq.com/openai/v1/models",
+        {
+          Authorization: `Bearer ${groqKey}`,
+        },
+      );
       const models = validate
         ? await filterUsableModels("groq", listed, {
             groqKey,
@@ -220,7 +242,10 @@ export async function handleModelsRoute(req: Request): Promise<Response> {
       const headers = openrouterKey
         ? { Authorization: `Bearer ${openrouterKey}` }
         : undefined;
-      const ids = await fetchModelIds("https://openrouter.ai/api/v1/models", headers);
+      const ids = await fetchModelIds(
+        "https://openrouter.ai/api/v1/models",
+        headers,
+      );
       const listed = ids.includes("openrouter/auto")
         ? ids
         : ["openrouter/auto", ...ids];

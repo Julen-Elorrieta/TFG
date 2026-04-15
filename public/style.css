@@ -1967,7 +1967,9 @@ a:hover {
   top: 2px;
   border-radius: 50%;
   background: #ef4444;
-  transition: transform var(--transition), background var(--transition);
+  transition:
+    transform var(--transition),
+    background var(--transition);
 }
 
 .service-enable-switch input:checked + .service-enable-slider {
