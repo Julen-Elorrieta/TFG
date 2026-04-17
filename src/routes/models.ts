@@ -39,6 +39,12 @@ async function runWithTimeout<T>(
   }
 }
 
+function jsonModelsResponse(models: string[]): Response {
+  return new Response(JSON.stringify({ models }), {
+    headers: { "Content-Type": "application/json", ...corsHeaders },
+  });
+}
+
 async function mapLimit<T, R>(
   items: T[],
   limit: number,
@@ -206,13 +212,9 @@ export async function handleModelsRoute(req: Request): Promise<Response> {
             openrouterKey,
           })
         : listed;
-      return new Response(JSON.stringify({ models }), {
-        headers: { "Content-Type": "application/json", ...corsHeaders },
-      });
+      return jsonModelsResponse(models);
     } catch {
-      return new Response(JSON.stringify({ models: [] }), {
-        headers: { "Content-Type": "application/json", ...corsHeaders },
-      });
+      return jsonModelsResponse([]);
     }
   }
 
@@ -229,13 +231,9 @@ export async function handleModelsRoute(req: Request): Promise<Response> {
             openrouterKey,
           })
         : listed;
-      return new Response(JSON.stringify({ models: ids }), {
-        headers: { "Content-Type": "application/json", ...corsHeaders },
-      });
+      return jsonModelsResponse(ids);
     } catch {
-      return new Response(JSON.stringify({ models: [] }), {
-        headers: { "Content-Type": "application/json", ...corsHeaders },
-      });
+      return jsonModelsResponse([]);
     }
   }
 
@@ -268,17 +266,11 @@ export async function handleModelsRoute(req: Request): Promise<Response> {
         ? ["openrouter/auto", ...validatedCandidates]
         : validatedCandidates;
       const uniqueModels = Array.from(new Set(models));
-      return new Response(JSON.stringify({ models: uniqueModels }), {
-        headers: { "Content-Type": "application/json", ...corsHeaders },
-      });
+      return jsonModelsResponse(uniqueModels);
     } catch {
-      return new Response(JSON.stringify({ models: [] }), {
-        headers: { "Content-Type": "application/json", ...corsHeaders },
-      });
+      return jsonModelsResponse([]);
     }
   }
 
-  return new Response(JSON.stringify({ models: [] }), {
-    headers: { "Content-Type": "application/json", ...corsHeaders },
-  });
+  return jsonModelsResponse([]);
 }

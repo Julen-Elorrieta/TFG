@@ -1286,7 +1286,7 @@ function saveEdit(idx) {
   streamResponse(conv);
 }
 
-function cancelEdit(idx) {
+function cancelEdit() {
   renderMessages();
 }
 
