@@ -21,8 +21,16 @@ function mapStaticAsset(
 }
 
 const staticAssets: Record<string, StaticAsset> = Object.fromEntries([
-  ...mapStaticAsset(["/", "/index.html"], staticFiles.html, "text/html; charset=utf-8"),
-  ...mapStaticAsset(["/style.css", "/css/style.css"], staticFiles.css, "text/css; charset=utf-8"),
+  ...mapStaticAsset(
+    ["/", "/index.html"],
+    staticFiles.html,
+    "text/html; charset=utf-8",
+  ),
+  ...mapStaticAsset(
+    ["/style.css", "/css/style.css"],
+    staticFiles.css,
+    "text/css; charset=utf-8",
+  ),
   ...mapStaticAsset(
     ["/app.js", "/js/app.js"],
     staticFiles.js,

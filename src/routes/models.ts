@@ -249,7 +249,11 @@ export async function handleModelsRoute(req: Request): Promise<Response> {
         .filter((model) => model !== "openrouter/auto")
         .slice(0, 80);
       const validatedCandidates = validate
-        ? await filterUsableModels("openrouter", validationCandidates, providerKeys)
+        ? await filterUsableModels(
+            "openrouter",
+            validationCandidates,
+            providerKeys,
+          )
         : validationCandidates;
       const canUseAuto = validate
         ? await canUseOpenRouterModel(openrouterKey, "openrouter/auto")

@@ -1482,8 +1482,9 @@ function setupDragDrop() {
     if (wrap) wrap.classList.add("drag-over");
   });
   body.addEventListener("dragleave", (e) => {
-    if (!e.relatedTarget || !body.contains(e.relatedTarget))
+    if (!e.relatedTarget || !body.contains(e.relatedTarget)) {
       if (wrap) wrap.classList.remove("drag-over");
+    }
   });
   body.addEventListener("drop", async (e) => {
     e.preventDefault();
