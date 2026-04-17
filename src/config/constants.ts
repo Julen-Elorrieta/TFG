@@ -19,6 +19,11 @@ export const corsHeaders = {
     "Content-Type, X-Groq-Key, X-Cerebras-Key, X-Openrouter-Key, X-Groq-Model, X-Cerebras-Model, X-Openrouter-Model",
 };
 
+export const openRouterHeaders = {
+  "HTTP-Referer": "http://localhost:3000",
+  "X-Title": "NeuralChat",
+};
+
 export const staticFiles = {
   html: Bun.file(resolvePublicFile("index.html")),
   css: Bun.file(resolvePublicFile("style.css")),

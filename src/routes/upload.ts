@@ -1,4 +1,4 @@
-import { corsHeaders } from "../config/constants";
+import { jsonErrorResponse, jsonResponse } from "../utils/http";
 import { getMimeType } from "../utils/mime";
 import { extractPdfText } from "../utils/pdf";
 
@@ -11,26 +11,20 @@ function createUploadResponse(
   mimeType: string,
   size: number,
 ): Response {
-  return new Response(
-    JSON.stringify({
-      type,
-      filename,
-      content,
-      mimeType,
-      size,
-    }),
-    { headers: { "Content-Type": "application/json", ...corsHeaders } },
-  );
+  return jsonResponse({
+    type,
+    filename,
+    content,
+    mimeType,
+    size,
+  });
 }
 
 export async function handleUploadRoute(req: Request): Promise<Response> {
   const formData = await req.formData();
   const file = formData.get("file") as File | null;
   if (!file) {
-    return new Response(JSON.stringify({ error: "No file provided" }), {
-      status: 400,
-      headers: { "Content-Type": "application/json", ...corsHeaders },
-    });
+    return jsonErrorResponse("No file provided", 400);
   }
 
   const filename = file.name;
@@ -48,11 +42,9 @@ export async function handleUploadRoute(req: Request): Promise<Response> {
     return createUploadResponse("text", filename, text, mimeType, size);
   }
 
-  if (mimeType.startsWith("image/")) {
-    const base64 = Buffer.from(buffer).toString("base64");
-    return createUploadResponse("image", filename, base64, mimeType, size);
-  }
-
   const base64 = Buffer.from(buffer).toString("base64");
-  return createUploadResponse("binary", filename, base64, mimeType, size);
+  const contentType: UploadContentType = mimeType.startsWith("image/")
+    ? "image"
+    : "binary";
+  return createUploadResponse(contentType, filename, base64, mimeType, size);
 }

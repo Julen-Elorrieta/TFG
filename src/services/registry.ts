@@ -5,6 +5,52 @@ import {
   createOpenRouterService,
 } from "./providers";
 
+type ServiceId = "groq" | "cerebras" | "openrouter";
+
+type ServiceConfig = {
+  id: ServiceId;
+  keyHeader: string;
+  keyEnv: string;
+  modelHeader: string;
+  modelEnv: string;
+  defaultModel: string;
+  create: (apiKey: string, model: string) => Promise<AIService>;
+};
+
+const serviceConfigs: ServiceConfig[] = [
+  {
+    id: "groq",
+    keyHeader: "X-Groq-Key",
+    keyEnv: "GROQ_API_KEY",
+    modelHeader: "X-Groq-Model",
+    modelEnv: "GROQ_MODEL",
+    defaultModel: "moonshotai/kimi-k2-instruct-0905",
+    create: createGroqService,
+  },
+  {
+    id: "cerebras",
+    keyHeader: "X-Cerebras-Key",
+    keyEnv: "CEREBRAS_API_KEY",
+    modelHeader: "X-Cerebras-Model",
+    modelEnv: "CEREBRAS_MODEL",
+    defaultModel: "gpt-oss-120b",
+    create: createCerebrasService,
+  },
+  {
+    id: "openrouter",
+    keyHeader: "X-Openrouter-Key",
+    keyEnv: "OPENROUTER_API_KEY",
+    modelHeader: "X-Openrouter-Model",
+    modelEnv: "OPENROUTER_MODEL",
+    defaultModel: "openrouter/auto",
+    create: createOpenRouterService,
+  },
+];
+
+function getHeaderOrEnv(req: Request, header: string, envKey: string): string {
+  return req.headers.get(header) || process.env[envKey] || "";
+}
+
 export async function getServicesFromRequest(req: Request): Promise<{
   registry: Record<string, AIService>;
   roundRobin: AIService[];
@@ -12,39 +58,15 @@ export async function getServicesFromRequest(req: Request): Promise<{
   const registry: Record<string, AIService> = {};
   const roundRobin: AIService[] = [];
 
-  const groqKey =
-    req.headers.get("X-Groq-Key") || process.env.GROQ_API_KEY || "";
-  const groqModel =
-    req.headers.get("X-Groq-Model") ||
-    process.env.GROQ_MODEL ||
-    "moonshotai/kimi-k2-instruct-0905";
-  if (groqKey) {
-    const svc = await createGroqService(groqKey, groqModel);
-    registry["groq"] = svc;
-    roundRobin.push(svc);
-  }
+  for (const service of serviceConfigs) {
+    const apiKey = getHeaderOrEnv(req, service.keyHeader, service.keyEnv);
+    if (!apiKey) continue;
 
-  const cerebrasKey =
-    req.headers.get("X-Cerebras-Key") || process.env.CEREBRAS_API_KEY || "";
-  const cerebrasModel =
-    req.headers.get("X-Cerebras-Model") ||
-    process.env.CEREBRAS_MODEL ||
-    "gpt-oss-120b";
-  if (cerebrasKey) {
-    const svc = await createCerebrasService(cerebrasKey, cerebrasModel);
-    registry["cerebras"] = svc;
-    roundRobin.push(svc);
-  }
-
-  const openrouterKey =
-    req.headers.get("X-Openrouter-Key") || process.env.OPENROUTER_API_KEY || "";
-  const openrouterModel =
-    req.headers.get("X-Openrouter-Model") ||
-    process.env.OPENROUTER_MODEL ||
-    "openrouter/auto";
-  if (openrouterKey) {
-    const svc = await createOpenRouterService(openrouterKey, openrouterModel);
-    registry["openrouter"] = svc;
+    const model =
+      getHeaderOrEnv(req, service.modelHeader, service.modelEnv) ||
+      service.defaultModel;
+    const svc = await service.create(apiKey, model);
+    registry[service.id] = svc;
     roundRobin.push(svc);
   }
 

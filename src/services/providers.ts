@@ -1,4 +1,5 @@
 import type { AIService, ChatMessage } from "../types/ai";
+import { openRouterHeaders } from "../config/constants";
 
 type ProviderChatMessage =
   | { role: "system"; content: string }
@@ -21,15 +22,15 @@ function toDeltaContent(chunk: unknown): string {
 }
 
 function toProviderMessages(messages: ChatMessage[]): ProviderChatMessage[] {
-  return messages.map((message) => {
-    if (message.role === "system") {
-      return { role: "system", content: message.content };
+  return messages.map(({ role, content }) => ({ role, content }));
+}
+
+function toTextStream(stream: AsyncIterable<unknown>): AsyncIterable<string> {
+  return (async function* () {
+    for await (const chunk of stream) {
+      yield toDeltaContent(chunk);
     }
-    if (message.role === "assistant") {
-      return { role: "assistant", content: message.content };
-    }
-    return { role: "user", content: message.content };
-  });
+  })();
 }
 
 export async function createGroqService(
@@ -51,11 +52,7 @@ export async function createGroqService(
         stream: true,
         stop: null,
       });
-      return (async function* () {
-        for await (const chunk of completion) {
-          yield chunk.choices[0]?.delta?.content || "";
-        }
-      })();
+      return toTextStream(completion);
     },
   };
 }
@@ -78,11 +75,7 @@ export async function createCerebrasService(
         temperature: 0.6,
         top_p: 0.95,
       });
-      return (async function* () {
-        for await (const chunk of stream) {
-          yield toDeltaContent(chunk);
-        }
-      })();
+      return toTextStream(stream);
     },
   };
 }
@@ -99,10 +92,7 @@ export async function createOpenRouterService(
       const client = new OpenAI({
         apiKey,
         baseURL: "https://openrouter.ai/api/v1",
-        defaultHeaders: {
-          "HTTP-Referer": "http://localhost:3000",
-          "X-Title": "NeuralChat",
-        },
+        defaultHeaders: openRouterHeaders,
       });
 
       const stream = await client.chat.completions.create({
@@ -113,11 +103,7 @@ export async function createOpenRouterService(
         max_tokens: 8192,
       });
 
-      return (async function* () {
-        for await (const chunk of stream) {
-          yield chunk.choices[0]?.delta?.content || "";
-        }
-      })();
+      return toTextStream(stream);
     },
   };
 }

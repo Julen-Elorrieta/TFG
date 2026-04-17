@@ -1,4 +1,5 @@
-import { corsHeaders } from "../config/constants";
+import { jsonResponse } from "../utils/http";
+import { openRouterHeaders } from "../config/constants";
 
 function extractModelIds(models: unknown): string[] {
   if (!models || typeof models !== "object") return [];
@@ -37,12 +38,6 @@ async function runWithTimeout<T>(
   } catch {
     return null;
   }
-}
-
-function jsonModelsResponse(models: string[]): Response {
-  return new Response(JSON.stringify({ models }), {
-    headers: { "Content-Type": "application/json", ...corsHeaders },
-  });
 }
 
 async function mapLimit<T, R>(
@@ -105,8 +100,7 @@ async function canUseOpenRouterModel(
   const result = await runWithTimeout(async () => {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
-      "HTTP-Referer": "http://localhost:3000",
-      "X-Title": "NeuralChat",
+      ...openRouterHeaders,
     };
     if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
     const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -150,40 +144,58 @@ async function canUseCerebrasModel(
   return result === true;
 }
 
+async function canUseModel(
+  service: "groq" | "cerebras" | "openrouter",
+  model: string,
+  keys: { groqKey: string; cerebrasKey: string; openrouterKey: string },
+): Promise<boolean> {
+  if (service === "groq") {
+    return canUseGroqModel(keys.groqKey, model);
+  }
+  if (service === "cerebras") {
+    return canUseCerebrasModel(keys.cerebrasKey, model);
+  }
+  return canUseOpenRouterModel(keys.openrouterKey, model);
+}
+
+async function filterPassingModels(
+  service: "groq" | "cerebras" | "openrouter",
+  models: string[],
+  keys: { groqKey: string; cerebrasKey: string; openrouterKey: string },
+  concurrency: number,
+): Promise<string[]> {
+  const checks = await mapLimit(models, concurrency, async (model) => ({
+    model,
+    ok: await canUseModel(service, model, keys),
+  }));
+  return checks.filter((c) => c.ok).map((c) => c.model);
+}
+
 async function filterUsableModels(
   service: "groq" | "cerebras" | "openrouter",
   models: string[],
   keys: { groqKey: string; cerebrasKey: string; openrouterKey: string },
 ): Promise<string[]> {
-  const checks = await mapLimit(models, 5, async (model) => {
-    if (service === "groq") {
-      return { model, ok: await canUseGroqModel(keys.groqKey, model) };
-    }
-    if (service === "cerebras") {
-      return { model, ok: await canUseCerebrasModel(keys.cerebrasKey, model) };
-    }
-    return {
-      model,
-      ok: await canUseOpenRouterModel(keys.openrouterKey, model),
-    };
-  });
-  const firstPass = checks.filter((c) => c.ok).map((c) => c.model);
+  const firstPass = await filterPassingModels(service, models, keys, 5);
   if (firstPass.length === 0) return [];
 
   // Strict mode: second pass to reduce false positives from transient provider responses.
-  const strictChecks = await mapLimit(firstPass, 3, async (model) => {
-    if (service === "groq") {
-      return { model, ok: await canUseGroqModel(keys.groqKey, model) };
-    }
-    if (service === "cerebras") {
-      return { model, ok: await canUseCerebrasModel(keys.cerebrasKey, model) };
-    }
-    return {
-      model,
-      ok: await canUseOpenRouterModel(keys.openrouterKey, model),
-    };
-  });
-  return strictChecks.filter((c) => c.ok).map((c) => c.model);
+  return filterPassingModels(service, firstPass, keys, 3);
+}
+
+async function modelsResponseFrom(
+  task: () => Promise<string[]>,
+): Promise<Response> {
+  try {
+    const models = await task();
+    return jsonResponse({ models });
+  } catch {
+    return emptyModelsResponse();
+  }
+}
+
+function emptyModelsResponse(): Response {
+  return jsonResponse({ models: [] });
 }
 
 export async function handleModelsRoute(req: Request): Promise<Response> {
@@ -196,49 +208,33 @@ export async function handleModelsRoute(req: Request): Promise<Response> {
     req.headers.get("X-Cerebras-Key") || process.env.CEREBRAS_API_KEY || "";
   const openrouterKey =
     req.headers.get("X-Openrouter-Key") || process.env.OPENROUTER_API_KEY || "";
+  const providerKeys = { groqKey, cerebrasKey, openrouterKey };
 
   if (service === "groq" && groqKey) {
-    try {
-      const listed = await fetchModelIds(
-        "https://api.groq.com/openai/v1/models",
-        {
-          Authorization: `Bearer ${groqKey}`,
-        },
-      );
-      const models = validate
-        ? await filterUsableModels("groq", listed, {
-            groqKey,
-            cerebrasKey,
-            openrouterKey,
-          })
+    return modelsResponseFrom(async () => {
+      const listed = await fetchModelIds("https://api.groq.com/openai/v1/models", {
+        Authorization: `Bearer ${groqKey}`,
+      });
+      return validate
+        ? filterUsableModels("groq", listed, providerKeys)
         : listed;
-      return jsonModelsResponse(models);
-    } catch {
-      return jsonModelsResponse([]);
-    }
+    });
   }
 
   if (service === "cerebras" && cerebrasKey) {
-    try {
+    return modelsResponseFrom(async () => {
       const Cerebras = (await import("@cerebras/cerebras_cloud_sdk")).default;
       const cerebras = new Cerebras({ apiKey: cerebrasKey });
       const models = await cerebras.models.list();
       const listed = extractModelIds(models);
-      const ids = validate
-        ? await filterUsableModels("cerebras", listed, {
-            groqKey,
-            cerebrasKey,
-            openrouterKey,
-          })
+      return validate
+        ? await filterUsableModels("cerebras", listed, providerKeys)
         : listed;
-      return jsonModelsResponse(ids);
-    } catch {
-      return jsonModelsResponse([]);
-    }
+    });
   }
 
   if (service === "openrouter") {
-    try {
+    return modelsResponseFrom(async () => {
       const headers = openrouterKey
         ? { Authorization: `Bearer ${openrouterKey}` }
         : undefined;
@@ -253,11 +249,7 @@ export async function handleModelsRoute(req: Request): Promise<Response> {
         .filter((model) => model !== "openrouter/auto")
         .slice(0, 80);
       const validatedCandidates = validate
-        ? await filterUsableModels("openrouter", validationCandidates, {
-            groqKey,
-            cerebrasKey,
-            openrouterKey,
-          })
+        ? await filterUsableModels("openrouter", validationCandidates, providerKeys)
         : validationCandidates;
       const canUseAuto = validate
         ? await canUseOpenRouterModel(openrouterKey, "openrouter/auto")
@@ -265,12 +257,9 @@ export async function handleModelsRoute(req: Request): Promise<Response> {
       const models = canUseAuto
         ? ["openrouter/auto", ...validatedCandidates]
         : validatedCandidates;
-      const uniqueModels = Array.from(new Set(models));
-      return jsonModelsResponse(uniqueModels);
-    } catch {
-      return jsonModelsResponse([]);
-    }
+      return Array.from(new Set(models));
+    });
   }
 
-  return jsonModelsResponse([]);
+  return emptyModelsResponse();
 }

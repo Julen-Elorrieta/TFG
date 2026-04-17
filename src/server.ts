@@ -3,6 +3,49 @@ import { handleChatRoute } from "./routes/chat";
 import { handleModelsRoute } from "./routes/models";
 import { handleServicesRoute } from "./routes/services";
 import { handleUploadRoute } from "./routes/upload";
+import { jsonErrorResponse } from "./utils/http";
+
+type StaticAsset = {
+  file: Blob;
+  contentType: string;
+};
+
+type RouteHandler = (req: Request) => Promise<Response>;
+
+function mapStaticAsset(
+  paths: string[],
+  file: Blob,
+  contentType: string,
+): Array<[string, StaticAsset]> {
+  return paths.map((path) => [path, { file, contentType }]);
+}
+
+const staticAssets: Record<string, StaticAsset> = Object.fromEntries([
+  ...mapStaticAsset(["/", "/index.html"], staticFiles.html, "text/html; charset=utf-8"),
+  ...mapStaticAsset(["/style.css", "/css/style.css"], staticFiles.css, "text/css; charset=utf-8"),
+  ...mapStaticAsset(
+    ["/app.js", "/js/app.js"],
+    staticFiles.js,
+    "application/javascript; charset=utf-8",
+  ),
+]);
+
+const apiRoutes: Record<string, RouteHandler> = {
+  "GET /services": handleServicesRoute,
+  "GET /models": handleModelsRoute,
+  "POST /upload": handleUploadRoute,
+  "POST /chat": handleChatRoute,
+};
+
+function createStaticResponse(asset: StaticAsset): Response {
+  return new Response(asset.file, {
+    headers: {
+      "Content-Type": asset.contentType,
+      "Cache-Control": "no-cache",
+      ...corsHeaders,
+    },
+  });
+}
 
 const server = Bun.serve({
   port: process.env.PORT ?? 3000,
@@ -16,67 +59,23 @@ const server = Bun.serve({
         return new Response(null, { status: 204, headers: corsHeaders });
       }
 
-      if (
-        req.method === "GET" &&
-        (pathname === "/" || pathname === "/index.html")
-      ) {
-        return new Response(staticFiles.html, {
-          headers: {
-            "Content-Type": "text/html; charset=utf-8",
-            "Cache-Control": "no-cache",
-            ...corsHeaders,
-          },
-        });
-      }
-      if (
-        req.method === "GET" &&
-        (pathname === "/style.css" || pathname === "/css/style.css")
-      ) {
-        return new Response(staticFiles.css, {
-          headers: {
-            "Content-Type": "text/css; charset=utf-8",
-            "Cache-Control": "no-cache",
-            ...corsHeaders,
-          },
-        });
-      }
-      if (
-        req.method === "GET" &&
-        (pathname === "/app.js" || pathname === "/js/app.js")
-      ) {
-        return new Response(staticFiles.js, {
-          headers: {
-            "Content-Type": "application/javascript; charset=utf-8",
-            "Cache-Control": "no-cache",
-            ...corsHeaders,
-          },
-        });
+      if (req.method === "GET") {
+        const staticAsset = staticAssets[pathname];
+        if (staticAsset) {
+          return createStaticResponse(staticAsset);
+        }
       }
 
-      if (req.method === "GET" && pathname === "/services") {
-        return handleServicesRoute(req);
-      }
-
-      if (req.method === "GET" && pathname === "/models") {
-        return handleModelsRoute(req);
-      }
-
-      if (req.method === "POST" && pathname === "/upload") {
-        return handleUploadRoute(req);
-      }
-
-      if (req.method === "POST" && pathname === "/chat") {
-        return handleChatRoute(req);
+      const routeHandler = apiRoutes[`${req.method} ${pathname}`];
+      if (routeHandler) {
+        return routeHandler(req);
       }
 
       return new Response("Not found", { status: 404, headers: corsHeaders });
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : String(err);
       console.error(`[ERROR] ${req.method} ${req.url}\n`, err);
-      return new Response(JSON.stringify({ error: errorMessage }), {
-        status: 500,
-        headers: { "Content-Type": "application/json", ...corsHeaders },
-      });
+      return jsonErrorResponse(errorMessage, 500);
     }
   },
 });

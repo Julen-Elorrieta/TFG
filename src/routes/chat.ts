@@ -1,6 +1,7 @@
 import { corsHeaders, pickRoundRobinService } from "../config/constants";
 import { getServicesFromRequest } from "../services/registry";
 import type { AIService, ChatMessage } from "../types/ai";
+import { jsonErrorResponse } from "../utils/http";
 
 type ChatRequestBody = {
   messages: ChatMessage[];
@@ -24,39 +25,24 @@ export async function handleChatRoute(req: Request): Promise<Response> {
   try {
     body = (await req.json()) as ChatRequestBody;
   } catch {
-    return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
-      status: 400,
-      headers: { "Content-Type": "application/json", ...corsHeaders },
-    });
+    return jsonErrorResponse("Invalid JSON body", 400);
   }
 
   const { messages, service: svcName } = body;
   if (!Array.isArray(messages) || !messages.every(isValidChatMessage)) {
-    return new Response(JSON.stringify({ error: "Invalid messages payload" }), {
-      status: 400,
-      headers: { "Content-Type": "application/json", ...corsHeaders },
-    });
+    return jsonErrorResponse("Invalid messages payload", 400);
   }
 
   if (svcName !== undefined && typeof svcName !== "string") {
-    return new Response(JSON.stringify({ error: "Invalid service value" }), {
-      status: 400,
-      headers: { "Content-Type": "application/json", ...corsHeaders },
-    });
+    return jsonErrorResponse("Invalid service value", 400);
   }
 
   const { registry, roundRobin } = await getServicesFromRequest(req);
 
   if (roundRobin.length === 0) {
-    return new Response(
-      JSON.stringify({
-        error:
-          "No API keys configured. Please add your API keys in the Settings panel.",
-      }),
-      {
-        status: 400,
-        headers: { "Content-Type": "application/json", ...corsHeaders },
-      },
+    return jsonErrorResponse(
+      "No API keys configured. Please add your API keys in the Settings panel.",
+      400,
     );
   }
 
@@ -77,14 +63,9 @@ export async function handleChatRoute(req: Request): Promise<Response> {
   } catch (err: unknown) {
     const errorMessage = getErrorMessage(err);
     console.error(`[ERROR] service.chat(${service.name}):`, err);
-    const errorPayload = {
-      error: errorMessage || "Service error",
+    return jsonErrorResponse(errorMessage || "Service error", 500, {
       service: service.name.toLowerCase(),
       model: service.model,
-    };
-    return new Response(JSON.stringify(errorPayload), {
-      status: 500,
-      headers: { "Content-Type": "application/json", ...corsHeaders },
     });
   }
 

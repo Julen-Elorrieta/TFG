@@ -71,6 +71,20 @@ function persistModelsCache() {
   }
 }
 
+function setCachedModels(svc, key, models) {
+  loadedModelCache[svc] = { key, models };
+  persistModelsCache();
+}
+
+function clearCachedModels(svc) {
+  loadedModelCache[svc] = null;
+  persistModelsCache();
+}
+
+function resetAutoLoadedKey(svc) {
+  lastAutoLoadedKeys[svc] = "";
+}
+
 function loadModelsCacheFromStorage() {
   try {
     const raw = localStorage.getItem(MODELS_CACHE_KEY);
@@ -328,15 +342,20 @@ function updateInputState() {
   if (noKeysBanner) noKeysBanner.style.display = hasKeys ? "none" : "flex";
 }
 
+function setPanelOpen(panelId, isOpen) {
+  const panel = document.getElementById(panelId);
+  if (!panel) return false;
+  panel.classList.toggle("open", isOpen);
+  return true;
+}
+
 function openSettings() {
-  const panel = document.getElementById("settings-panel");
-  if (!panel) return;
-  panel.classList.add("open");
+  if (!setPanelOpen("settings-panel", true)) return;
   populateSettingsForm();
 }
 
 function closeSettings() {
-  document.getElementById("settings-panel")?.classList.remove("open");
+  setPanelOpen("settings-panel", false);
 }
 
 function populateSettingsForm() {
@@ -412,9 +431,8 @@ function onApiKeyInput(svc) {
   const key = keyEl?.value?.trim() || "";
   if (modelLoadTimers[svc]) clearTimeout(modelLoadTimers[svc]);
   if (!key) {
-    lastAutoLoadedKeys[svc] = "";
-    loadedModelCache[svc] = null;
-    persistModelsCache();
+    resetAutoLoadedKey(svc);
+    clearCachedModels(svc);
     clearServiceBlocked(svc);
     resetModelSelect(svc);
     return;
@@ -447,6 +465,14 @@ function updateKeyStatuses() {
   });
 }
 
+function refreshServiceStateUI(options = {}) {
+  const { updateSidebarIndicator = false } = options;
+  loadServices();
+  updateKeyStatuses();
+  updateInputState();
+  if (updateSidebarIndicator) updateSidebarKeysIndicator();
+}
+
 function saveSettings() {
   SERVICES.forEach((svc) => {
     const keyEl = document.getElementById(`key-${svc}`);
@@ -459,15 +485,11 @@ function saveSettings() {
     }
     const currentKey = state.apiKeys[svc].key || "";
     if (loadedModelCache[svc]?.key !== currentKey) {
-      loadedModelCache[svc] = null;
+      clearCachedModels(svc);
     }
   });
-  persistModelsCache();
   saveToStorage();
-  loadServices();
-  updateKeyStatuses();
-  updateInputState();
-  updateSidebarKeysIndicator();
+  refreshServiceStateUI({ updateSidebarIndicator: true });
   closeSettings();
   toast("Configuración guardada ✓", "success");
 }
@@ -478,15 +500,12 @@ function clearKey(svc) {
   state.apiKeys[svc].key = "";
   state.apiKeys[svc].model = DEFAULT_MODELS[svc];
   state.apiKeys[svc].enabled = true;
-  lastAutoLoadedKeys[svc] = "";
-  loadedModelCache[svc] = null;
-  persistModelsCache();
+  resetAutoLoadedKey(svc);
+  clearCachedModels(svc);
   clearServiceBlocked(svc);
   resetModelSelect(svc);
   saveToStorage();
-  updateKeyStatuses();
-  updateInputState();
-  loadServices();
+  refreshServiceStateUI();
   toast(`Clave ${capitalize(svc)} eliminada`, "info");
 }
 
@@ -504,10 +523,8 @@ function toggleServiceEnabled(svc, checked) {
     state.selectedService = "auto";
   }
   updateEnabledButton(svc);
-  updateKeyStatuses();
   saveToStorage();
-  loadServices();
-  updateInputState();
+  refreshServiceStateUI();
 }
 
 function copyApiKey(svc) {
@@ -562,11 +579,7 @@ async function loadModelsForService(svc, opts = {}) {
     const data = await res.json();
     if (data.models && data.models.length > 0) {
       clearServiceBlocked(svc);
-      loadedModelCache[svc] = {
-        key: tempKey || state.apiKeys[svc]?.key || "",
-        models: data.models,
-      };
-      persistModelsCache();
+      setCachedModels(svc, tempKey || state.apiKeys[svc]?.key || "", data.models);
       setSelectOptions(
         modelEl,
         data.models,
@@ -575,16 +588,14 @@ async function loadModelsForService(svc, opts = {}) {
       if (!silent) toast(`${data.models.length} modelos cargados`, "success");
     } else {
       setServiceBlocked(svc, "Sin modelos válidos");
-      loadedModelCache[svc] = null;
-      persistModelsCache();
+      clearCachedModels(svc);
       resetModelSelect(svc);
       if (!silent)
         toast("No hay modelos disponibles para esta API key", "error");
     }
   } catch {
     setServiceBlocked(svc, "Error de validación");
-    loadedModelCache[svc] = null;
-    persistModelsCache();
+    clearCachedModels(svc);
     setModelSelectLoading(svc, "Error validando modelos");
     if (!silent) toast("Error cargando modelos", "error");
   } finally {
@@ -600,6 +611,15 @@ function updateServiceBadge() {
     const meta = SERVICE_META?.[val];
     label.textContent = meta ? meta.label : capitalize(val);
   }
+}
+
+function focusComposer() {
+  const input = document.getElementById("msg-input");
+  if (input) input.focus();
+}
+
+function closeSidebarOnMobile() {
+  if (window.innerWidth <= 768) closeMobileSidebar();
 }
 
 function newConversation() {
@@ -620,9 +640,8 @@ function newConversation() {
   renderMessages();
   const titleEl = document.getElementById("chat-title-header");
   if (titleEl) titleEl.textContent = "Nueva conversación";
-  const input = document.getElementById("msg-input");
-  if (input) input.focus();
-  if (window.innerWidth <= 768) closeMobileSidebar();
+  focusComposer();
+  closeSidebarOnMobile();
 }
 
 function switchConversation(id) {
@@ -638,9 +657,8 @@ function switchConversation(id) {
   if (titleEl) titleEl.textContent = conv?.title || "Conversación";
   const sysEl = document.getElementById("system-prompt-input");
   if (sysEl) sysEl.value = conv?.systemPrompt || "";
-  const input = document.getElementById("msg-input");
-  if (input) input.focus();
-  if (window.innerWidth <= 768) closeMobileSidebar();
+  focusComposer();
+  closeSidebarOnMobile();
 }
 
 function deleteConversation(id, e) {
@@ -899,6 +917,19 @@ function addMessageToDOM(msg, idx) {
   scrollToBottom();
 }
 
+function renderCodeBlock(code, lang = "texto", includeLanguageClass = false) {
+  return `<div class="code-block-wrapper">
+          <div class="code-block-header">
+            <span class="code-lang">${escHtml(lang)}</span>
+            <button class="btn-copy-code" onclick="copyCodeBlock(this)">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+              Copiar
+            </button>
+          </div>
+          <pre><code${includeLanguageClass ? ` class="language-${escHtml(lang)}"` : ""}>${code}</code></pre>
+        </div>`;
+}
+
 function renderMarkdown(text) {
   if (!text) return "";
   try {
@@ -907,31 +938,11 @@ function renderMarkdown(text) {
     return html
       .replace(
         /<pre><code class="language-([^"]+)">([\s\S]*?)<\/code><\/pre>/g,
-        (_, lang, code) => {
-          return `<div class="code-block-wrapper">
-          <div class="code-block-header">
-            <span class="code-lang">${escHtml(lang)}</span>
-            <button class="btn-copy-code" onclick="copyCodeBlock(this)">
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
-              Copiar
-            </button>
-          </div>
-          <pre><code class="language-${escHtml(lang)}">${code}</code></pre>
-        </div>`;
-        },
+        (_, lang, code) => renderCodeBlock(code, lang, true),
       )
-      .replace(/<pre><code>([\s\S]*?)<\/code><\/pre>/g, (_, code) => {
-        return `<div class="code-block-wrapper">
-          <div class="code-block-header">
-            <span class="code-lang">texto</span>
-            <button class="btn-copy-code" onclick="copyCodeBlock(this)">
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
-              Copiar
-            </button>
-          </div>
-          <pre><code>${code}</code></pre>
-        </div>`;
-      });
+      .replace(/<pre><code>([\s\S]*?)<\/code><\/pre>/g, (_, code) =>
+        renderCodeBlock(code),
+      );
   } catch {
     return escHtml(text);
   }
@@ -1316,7 +1327,7 @@ function copyCodeBlock(btn) {
 async function handleFileInput(event) {
   const files = Array.from(event.target.files);
   event.target.value = "";
-  for (const file of files) await processFile(file);
+  await processFiles(files);
 }
 
 async function processFile(file) {
@@ -1344,6 +1355,10 @@ async function processFile(file) {
     removeToast(toastId);
     toast(`Error: ${getErrorMessage(error)}`, "error");
   }
+}
+
+async function processFiles(files) {
+  for (const file of files) await processFile(file);
 }
 
 function renderFilePreviews() {
@@ -1474,7 +1489,7 @@ function setupDragDrop() {
     e.preventDefault();
     if (wrap) wrap.classList.remove("drag-over");
     const files = Array.from(e.dataTransfer.files);
-    for (const file of files) await processFile(file);
+    await processFiles(files);
   });
 }
 
@@ -1541,10 +1556,10 @@ function openExport() {
     toast("No hay mensajes para exportar", "info");
     return;
   }
-  document.getElementById("export-panel")?.classList.add("open");
+  setPanelOpen("export-panel", true);
 }
 function closeExport() {
-  document.getElementById("export-panel")?.classList.remove("open");
+  setPanelOpen("export-panel", false);
 }
 
 function exportAs(format) {
@@ -1648,8 +1663,8 @@ function setupKeyboardShortcuts() {
       if (state.streaming) stopStreaming();
       document.getElementById("system-panel")?.classList.remove("open");
       document.getElementById("btn-system")?.classList.remove("active");
-      document.getElementById("export-panel")?.classList.remove("open");
-      document.getElementById("settings-panel")?.classList.remove("open");
+      setPanelOpen("export-panel", false);
+      setPanelOpen("settings-panel", false);
       closeServiceDropdown();
       closeLightbox();
     }
@@ -1730,16 +1745,26 @@ function useChip(text) {
 
 let toastIdCounter = 0;
 
-function toast(msg, type = "info", duration = 3500) {
+function appendToast(type, innerHtml) {
   const container = document.getElementById("toast-container");
-  if (!container) return;
+  if (!container) return null;
   const id = "toast_" + ++toastIdCounter;
   const el = document.createElement("div");
   el.id = id;
   el.className = `toast ${type}`;
-  const icons = { info: "●", success: "✓", error: "✕" };
-  el.innerHTML = `<span class="toast-icon">${icons[type] || "●"}</span><span>${escHtml(msg)}</span>`;
+  el.innerHTML = innerHtml;
   container.appendChild(el);
+  return { id, el };
+}
+
+function toast(msg, type = "info", duration = 3500) {
+  const icons = { info: "●", success: "✓", error: "✕" };
+  const toastEntry = appendToast(
+    type,
+    `<span class="toast-icon">${icons[type] || "●"}</span><span>${escHtml(msg)}</span>`,
+  );
+  if (!toastEntry) return;
+  const { id, el } = toastEntry;
   setTimeout(() => {
     el.style.animation = "toastOut 0.25s ease-in forwards";
     setTimeout(() => el.remove(), 250);
@@ -1748,15 +1773,11 @@ function toast(msg, type = "info", duration = 3500) {
 }
 
 function toastProgress(msg) {
-  const container = document.getElementById("toast-container");
-  if (!container) return null;
-  const id = "toast_" + ++toastIdCounter;
-  const el = document.createElement("div");
-  el.id = id;
-  el.className = "toast info";
-  el.innerHTML = `<span class="toast-spinner"></span><span>${escHtml(msg)}</span>`;
-  container.appendChild(el);
-  return id;
+  const toastEntry = appendToast(
+    "info",
+    `<span class="toast-spinner"></span><span>${escHtml(msg)}</span>`,
+  );
+  return toastEntry?.id ?? null;
 }
 
 function removeToast(id) {
