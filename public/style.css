@@ -95,12 +95,16 @@ body {
 body {
   font-family: var(--font-ui);
   background:
-    radial-gradient(1200px 600px at -10% -20%,
+    radial-gradient(
+      1200px 600px at -10% -20%,
       rgba(124, 106, 247, 0.1),
-      transparent 60%),
-    radial-gradient(900px 500px at 110% 0%,
+      transparent 60%
+    ),
+    radial-gradient(
+      900px 500px at 110% 0%,
       rgba(96, 165, 250, 0.08),
-      transparent 55%),
+      transparent 55%
+    ),
     var(--bg-base);
   color: var(--text-primary);
   font-size: 14.5px;
@@ -710,9 +714,11 @@ a:hover {
   align-items: center;
   gap: 10px;
   padding: 10px 16px;
-  background: linear-gradient(135deg,
-      rgba(124, 106, 247, 0.08),
-      rgba(124, 106, 247, 0.04));
+  background: linear-gradient(
+    135deg,
+    rgba(124, 106, 247, 0.08),
+    rgba(124, 106, 247, 0.04)
+  );
   border-bottom: 1px solid var(--accent-dim);
   color: var(--text-secondary);
   font-size: 13px;
@@ -818,9 +824,11 @@ a:hover {
 }
 
 .msg-row.user .msg-bubble {
-  background: linear-gradient(180deg,
-      color-mix(in srgb, var(--user-bg) 96%, white 4%),
-      var(--user-bg));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--user-bg) 96%, white 4%),
+    var(--user-bg)
+  );
   border: 1px solid color-mix(in srgb, var(--user-border) 86%, white 14%);
   align-self: flex-end;
   max-width: 80%;
@@ -833,9 +841,11 @@ a:hover {
 }
 
 .msg-row.assistant .msg-bubble {
-  background: color-mix(in srgb,
-      var(--assistant-bg) 92%,
-      var(--bg-elevated) 8%);
+  background: color-mix(
+    in srgb,
+    var(--assistant-bg) 92%,
+    var(--bg-elevated) 8%
+  );
   border: 1px solid var(--border-strong);
   max-width: 100%;
   border-bottom-left-radius: 4px;
@@ -952,7 +962,6 @@ a:hover {
 }
 
 @keyframes blink {
-
   0%,
   100% {
     opacity: 1;
@@ -1000,7 +1009,7 @@ a:hover {
 }
 
 .msg-row.user:hover .msg-actions,
-.msg-row.user .msg-bubble:hover+.msg-actions,
+.msg-row.user .msg-bubble:hover + .msg-actions,
 .msg-row.user .msg-actions:hover {
   opacity: 1;
   transform: translateY(0) scale(1);
@@ -1200,7 +1209,6 @@ a:hover {
 }
 
 @keyframes float {
-
   0%,
   100% {
     transform: translateY(0);
@@ -2022,12 +2030,12 @@ a:hover {
     background var(--transition);
 }
 
-.service-enable-switch input:checked+.service-enable-slider {
+.service-enable-switch input:checked + .service-enable-slider {
   background: rgba(74, 222, 128, 0.16);
   border-color: rgba(74, 222, 128, 0.35);
 }
 
-.service-enable-switch input:checked+.service-enable-slider::before {
+.service-enable-switch input:checked + .service-enable-slider::before {
   transform: translateX(16px);
   background: #22c55e;
 }
@@ -2170,7 +2178,6 @@ select.model-input {
 }
 
 @keyframes typingBounce {
-
   0%,
   80%,
   100% {
