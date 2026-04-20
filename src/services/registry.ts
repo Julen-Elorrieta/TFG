@@ -47,7 +47,11 @@ const serviceConfigs: ServiceConfig[] = [
   },
 ];
 
-function getHeaderOrEnv(req: Request, header: string, envKey: string): string {
+function readHeaderOrEnvValue(
+  req: Request,
+  header: string,
+  envKey: string,
+): string {
   return req.headers.get(header) || process.env[envKey] || "";
 }
 
@@ -59,15 +63,15 @@ export async function getServicesFromRequest(req: Request): Promise<{
   const roundRobin: AIService[] = [];
 
   for (const service of serviceConfigs) {
-    const apiKey = getHeaderOrEnv(req, service.keyHeader, service.keyEnv);
+    const apiKey = readHeaderOrEnvValue(req, service.keyHeader, service.keyEnv);
     if (!apiKey) continue;
 
     const model =
-      getHeaderOrEnv(req, service.modelHeader, service.modelEnv) ||
+      readHeaderOrEnvValue(req, service.modelHeader, service.modelEnv) ||
       service.defaultModel;
-    const svc = await service.create(apiKey, model);
-    registry[service.id] = svc;
-    roundRobin.push(svc);
+    const serviceInstance = await service.create(apiKey, model);
+    registry[service.id] = serviceInstance;
+    roundRobin.push(serviceInstance);
   }
 
   return { registry, roundRobin };

@@ -1,7 +1,7 @@
 import type { AIService } from "../types/ai";
 import { join } from "node:path";
 
-export function resolvePublicFile(filename: string): string {
+export function resolvePublicAssetPath(filename: string): string {
   const dir = import.meta.dir.replace(/\\/g, "/").toLowerCase();
   if (dir.endsWith("/src/config")) {
     return join(import.meta.dir, "../../public", filename);
@@ -34,25 +34,25 @@ export const staticModuleNames = [
 
 type StaticModuleName = (typeof staticModuleNames)[number];
 
-function getStaticModuleFile(name: StaticModuleName): Blob {
-  return Bun.file(resolvePublicFile(`modules/${name}.js`));
+function getStaticModuleAssetFile(name: StaticModuleName): Blob {
+  return Bun.file(resolvePublicAssetPath(`modules/${name}.js`));
 }
 
-function createStaticModuleFiles(): Record<StaticModuleName, Blob> {
+function buildStaticModuleFileMap(): Record<StaticModuleName, Blob> {
   return {
-    chat: getStaticModuleFile("chat"),
-    export: getStaticModuleFile("export"),
-    files: getStaticModuleFile("files"),
-    settings: getStaticModuleFile("settings"),
-    ui: getStaticModuleFile("ui"),
+    chat: getStaticModuleAssetFile("chat"),
+    export: getStaticModuleAssetFile("export"),
+    files: getStaticModuleAssetFile("files"),
+    settings: getStaticModuleAssetFile("settings"),
+    ui: getStaticModuleAssetFile("ui"),
   };
 }
 
 export const staticFiles = {
-  html: Bun.file(resolvePublicFile("index.html")),
-  css: Bun.file(resolvePublicFile("style.css")),
-  js: Bun.file(resolvePublicFile("app.js")),
-  modules: createStaticModuleFiles(),
+  html: Bun.file(resolvePublicAssetPath("index.html")),
+  css: Bun.file(resolvePublicAssetPath("style.css")),
+  js: Bun.file(resolvePublicAssetPath("js/app.js")),
+  modules: buildStaticModuleFileMap(),
 };
 
 let rrIndex = 0;

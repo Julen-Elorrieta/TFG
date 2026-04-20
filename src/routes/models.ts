@@ -30,7 +30,7 @@ function getModelsCacheTtlMs(): number {
   return parsed;
 }
 
-function hashValue(value: string): string {
+function hashSecretKeyValue(value: string): string {
   return createHash("sha256").update(value).digest("hex");
 }
 
@@ -39,7 +39,7 @@ function createCacheKey(
   validate: boolean,
   apiKey: string,
 ): string {
-  return `${service}:${validate ? "validate" : "list"}:${hashValue(apiKey)}`;
+  return `${service}:${validate ? "validate" : "list"}:${hashSecretKeyValue(apiKey)}`;
 }
 
 function getCachedModels(cacheKey: string): string[] | null {
@@ -73,7 +73,7 @@ function extractModelIds(models: unknown): string[] {
     .filter((id): id is string => id !== null);
 }
 
-async function fetchModelIds(
+async function fetchModelIdsFromEndpoint(
   endpoint: string,
   headers?: Record<string, string>,
 ): Promise<string[]> {
@@ -83,7 +83,7 @@ async function fetchModelIds(
   return extractModelIds(payload);
 }
 
-async function runWithTimeout<T>(
+async function runTaskWithTimeout<T>(
   task: () => Promise<T>,
   timeoutMs: number,
 ): Promise<T | null> {
@@ -103,12 +103,12 @@ async function runWithTimeout<T>(
   }
 }
 
-async function canUseStreamingEndpoint(
+async function canReceiveStreamFromEndpoint(
   endpoint: string,
   headers: Record<string, string>,
   body: Record<string, unknown>,
 ): Promise<boolean> {
-  const result = await runWithTimeout(async () => {
+  const result = await runTaskWithTimeout(async () => {
     const abort = new AbortController();
     const timeout = setTimeout(
       () => abort.abort(),
@@ -133,8 +133,11 @@ async function canUseStreamingEndpoint(
   return result === true;
 }
 
-async function canUseGroqModel(apiKey: string, model: string): Promise<boolean> {
-  return canUseStreamingEndpoint(
+async function canUseGroqModel(
+  apiKey: string,
+  model: string,
+): Promise<boolean> {
+  return canReceiveStreamFromEndpoint(
     "https://api.groq.com/openai/v1/chat/completions",
     {
       Authorization: `Bearer ${apiKey}`,
@@ -159,7 +162,7 @@ async function canUseOpenRouterModel(
     ...openRouterHeaders,
   };
   if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
-  return canUseStreamingEndpoint(
+  return canReceiveStreamFromEndpoint(
     "https://openrouter.ai/api/v1/chat/completions",
     headers,
     {
@@ -175,7 +178,7 @@ async function canUseCerebrasModel(
   apiKey: string,
   model: string,
 ): Promise<boolean> {
-  const result = await runWithTimeout(async () => {
+  const result = await runTaskWithTimeout(async () => {
     const Cerebras = (await import("@cerebras/cerebras_cloud_sdk")).default;
     const cerebras = new Cerebras({ apiKey });
     const stream = await cerebras.chat.completions.create({
@@ -193,7 +196,7 @@ async function canUseCerebrasModel(
   return result === true;
 }
 
-async function canUseModel(
+async function canUseServiceModel(
   service: ServiceId,
   model: string,
   keys: ProviderKeys,
@@ -207,7 +210,7 @@ async function canUseModel(
   return canUseOpenRouterModel(keys.openrouterKey, model);
 }
 
-async function mapLimit<T, R>(
+async function mapWithConcurrencyLimit<T, R>(
   items: T[],
   limit: number,
   mapper: (item: T) => Promise<R>,
@@ -238,10 +241,14 @@ async function filterPassingModels(
   keys: ProviderKeys,
   concurrency: number,
 ): Promise<string[]> {
-  const checks = await mapLimit(models, concurrency, async (model) => ({
-    model,
-    ok: await canUseModel(service, model, keys),
-  }));
+  const checks = await mapWithConcurrencyLimit(
+    models,
+    concurrency,
+    async (model) => ({
+      model,
+      ok: await canUseServiceModel(service, model, keys),
+    }),
+  );
   return checks.filter((entry) => entry.ok).map((entry) => entry.model);
 }
 
@@ -258,7 +265,7 @@ async function filterUsableModels(
 }
 
 async function listGroqModels(apiKey: string): Promise<string[]> {
-  return fetchModelIds("https://api.groq.com/openai/v1/models", {
+  return fetchModelIdsFromEndpoint("https://api.groq.com/openai/v1/models", {
     Authorization: `Bearer ${apiKey}`,
   });
 }
@@ -272,13 +279,16 @@ async function listCerebrasModels(apiKey: string): Promise<string[]> {
 
 async function listOpenRouterModels(apiKey: string): Promise<string[]> {
   const headers = apiKey ? { Authorization: `Bearer ${apiKey}` } : undefined;
-  const ids = await fetchModelIds("https://openrouter.ai/api/v1/models", headers);
+  const ids = await fetchModelIdsFromEndpoint(
+    "https://openrouter.ai/api/v1/models",
+    headers,
+  );
   return ids.includes(OPENROUTER_AUTO_MODEL)
     ? ids
     : [OPENROUTER_AUTO_MODEL, ...ids];
 }
 
-async function loadModelsForService(
+async function fetchListedModelsForService(
   service: ServiceId,
   keys: ProviderKeys,
 ): Promise<string[]> {
@@ -314,7 +324,7 @@ async function validateModelsForService(
   return Array.from(new Set(models));
 }
 
-function getServiceApiKey(service: ServiceId, keys: ProviderKeys): string {
+function getApiKeyForService(service: ServiceId, keys: ProviderKeys): string {
   if (service === "groq") return keys.groqKey;
   if (service === "cerebras") return keys.cerebrasKey;
   return keys.openrouterKey;
@@ -324,49 +334,51 @@ function isServiceId(value: string | null): value is ServiceId {
   return value === "groq" || value === "cerebras" || value === "openrouter";
 }
 
-function modelsResponse(models: string[]): Response {
+function createModelsResponse(models: string[]): Response {
   return jsonResponse({ models });
 }
 
-function emptyModelsResponse(): Response {
-  return modelsResponse([]);
+function createEmptyModelsResponse(): Response {
+  return createModelsResponse([]);
 }
 
 export async function handleModelsRoute(req: Request): Promise<Response> {
   const url = new URL(req.url);
   const serviceParam = url.searchParams.get("service");
   const validate = url.searchParams.get("validate") === "1";
-  if (!isServiceId(serviceParam)) return emptyModelsResponse();
+  if (!isServiceId(serviceParam)) return createEmptyModelsResponse();
 
   const keys: ProviderKeys = {
     groqKey: req.headers.get("X-Groq-Key") || process.env.GROQ_API_KEY || "",
     cerebrasKey:
       req.headers.get("X-Cerebras-Key") || process.env.CEREBRAS_API_KEY || "",
     openrouterKey:
-      req.headers.get("X-Openrouter-Key") || process.env.OPENROUTER_API_KEY || "",
+      req.headers.get("X-Openrouter-Key") ||
+      process.env.OPENROUTER_API_KEY ||
+      "",
   };
 
   if (
     (serviceParam === "groq" && !keys.groqKey) ||
     (serviceParam === "cerebras" && !keys.cerebrasKey)
   ) {
-    return emptyModelsResponse();
+    return createEmptyModelsResponse();
   }
 
-  const serviceApiKey = getServiceApiKey(serviceParam, keys);
+  const serviceApiKey = getApiKeyForService(serviceParam, keys);
   const cacheKey = createCacheKey(serviceParam, validate, serviceApiKey);
   const cached = getCachedModels(cacheKey);
-  if (cached) return modelsResponse(cached);
+  if (cached) return createModelsResponse(cached);
 
   try {
-    const listed = await loadModelsForService(serviceParam, keys);
+    const listed = await fetchListedModelsForService(serviceParam, keys);
     const models = validate
       ? await validateModelsForService(serviceParam, listed, keys)
       : listed;
     setCachedModels(cacheKey, models);
-    return modelsResponse(models);
+    return createModelsResponse(models);
   } catch (error: unknown) {
     console.error("[ERROR] /models:", error);
-    return emptyModelsResponse();
+    return createEmptyModelsResponse();
   }
 }

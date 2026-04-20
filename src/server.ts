@@ -1,4 +1,8 @@
-import { corsHeaders, staticFiles, staticModuleNames } from "./config/constants";
+import {
+  corsHeaders,
+  staticFiles,
+  staticModuleNames,
+} from "./config/constants";
 import { handleChatRoute } from "./routes/chat";
 import { handleModelsRoute } from "./routes/models";
 import { handleServicesRoute } from "./routes/services";
@@ -13,7 +17,7 @@ type StaticAsset = {
 type RouteHandler = (req: Request) => Promise<Response>;
 const JS_CONTENT_TYPE = "application/javascript; charset=utf-8";
 
-function mapStaticAsset(
+function mapPathsToStaticAsset(
   paths: string[],
   file: Blob,
   contentType: string,
@@ -21,7 +25,7 @@ function mapStaticAsset(
   return paths.map((path) => [path, { file, contentType }]);
 }
 
-function mapModuleAssets(): Array<[string, StaticAsset]> {
+function mapModulePathsToStaticAssets(): Array<[string, StaticAsset]> {
   return staticModuleNames.map((name) => [
     `/modules/${name}.js`,
     {
@@ -32,22 +36,18 @@ function mapModuleAssets(): Array<[string, StaticAsset]> {
 }
 
 const staticAssets: Record<string, StaticAsset> = Object.fromEntries([
-  ...mapStaticAsset(
+  ...mapPathsToStaticAsset(
     ["/", "/index.html"],
     staticFiles.html,
     "text/html; charset=utf-8",
   ),
-  ...mapStaticAsset(
+  ...mapPathsToStaticAsset(
     ["/css/style.css"],
     staticFiles.css,
     "text/css; charset=utf-8",
   ),
-  ...mapStaticAsset(
-    ["/js/app.js"],
-    staticFiles.js,
-    JS_CONTENT_TYPE,
-  ),
-  ...mapModuleAssets(),
+  ...mapPathsToStaticAsset(["/js/app.js"], staticFiles.js, JS_CONTENT_TYPE),
+  ...mapModulePathsToStaticAssets(),
 ]);
 
 const apiRoutes: Record<string, RouteHandler> = {
@@ -57,7 +57,7 @@ const apiRoutes: Record<string, RouteHandler> = {
   "POST /chat": handleChatRoute,
 };
 
-function createStaticResponse(asset: StaticAsset): Response {
+function createStaticAssetResponse(asset: StaticAsset): Response {
   return new Response(asset.file, {
     headers: {
       "Content-Type": asset.contentType,
@@ -82,7 +82,7 @@ const server = Bun.serve({
       if (req.method === "GET") {
         const staticAsset = staticAssets[pathname];
         if (staticAsset) {
-          return createStaticResponse(staticAsset);
+          return createStaticAssetResponse(staticAsset);
         }
       }
 

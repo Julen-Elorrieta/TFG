@@ -14,21 +14,25 @@ type DeltaChunk = {
   }>;
 };
 
-function toDeltaContent(chunk: unknown): string {
+function extractProviderDeltaContent(chunk: unknown): string {
   if (!chunk || typeof chunk !== "object") return "";
   const choices = (chunk as DeltaChunk).choices;
   const content = choices?.[0]?.delta?.content;
   return typeof content === "string" ? content : "";
 }
 
-function toProviderMessages(messages: ChatMessage[]): ProviderChatMessage[] {
+function mapChatMessagesToProviderPayload(
+  messages: ChatMessage[],
+): ProviderChatMessage[] {
   return messages.map(({ role, content }) => ({ role, content }));
 }
 
-function toTextStream(stream: AsyncIterable<unknown>): AsyncIterable<string> {
+function mapProviderStreamToTextChunks(
+  stream: AsyncIterable<unknown>,
+): AsyncIterable<string> {
   return (async function* () {
     for await (const chunk of stream) {
-      yield toDeltaContent(chunk);
+      yield extractProviderDeltaContent(chunk);
     }
   })();
 }
@@ -52,7 +56,7 @@ export async function createGroqService(
         stream: true,
         stop: null,
       });
-      return toTextStream(completion);
+      return mapProviderStreamToTextChunks(completion);
     },
   };
 }
@@ -68,14 +72,14 @@ export async function createCerebrasService(
       const Cerebras = (await import("@cerebras/cerebras_cloud_sdk")).default;
       const cerebras = new Cerebras({ apiKey });
       const stream = await cerebras.chat.completions.create({
-        messages: toProviderMessages(messages),
+        messages: mapChatMessagesToProviderPayload(messages),
         model,
         stream: true,
         max_completion_tokens: 8192,
         temperature: 0.6,
         top_p: 0.95,
       });
-      return toTextStream(stream);
+      return mapProviderStreamToTextChunks(stream);
     },
   };
 }
@@ -103,7 +107,7 @@ export async function createOpenRouterService(
         max_tokens: 8192,
       });
 
-      return toTextStream(stream);
+      return mapProviderStreamToTextChunks(stream);
     },
   };
 }

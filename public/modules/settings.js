@@ -1,4 +1,4 @@
-export function inferUnusableServiceReason(message = "") {
+export function deriveUnusableServiceReason(message = "") {
   const msg = String(message).toLowerCase();
   if (
     msg.includes("insufficient credits") ||

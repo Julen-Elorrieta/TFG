@@ -98,7 +98,7 @@ function detectMimeTypeBySignature(bytes: Uint8Array): string | null {
   return null;
 }
 
-function resolveMimeType(file: File, bytes: Uint8Array): string {
+function resolveUploadedFileMimeType(file: File, bytes: Uint8Array): string {
   const signatureMime = detectMimeTypeBySignature(bytes);
   if (signatureMime) return signatureMime;
 
@@ -111,19 +111,19 @@ function resolveMimeType(file: File, bytes: Uint8Array): string {
 }
 
 export async function handleUploadRoute(req: Request): Promise<Response> {
-  let rawFile: unknown = null;
+  let uploadedFile: unknown = null;
   try {
-    rawFile = (await req.formData()).get("file");
+    uploadedFile = (await req.formData()).get("file");
   } catch (error: unknown) {
     console.error("[ERROR] /upload formData:", error);
     return jsonErrorResponse("Invalid multipart form-data payload", 400);
   }
 
-  if (!(rawFile instanceof File)) {
+  if (!(uploadedFile instanceof File)) {
     return jsonErrorResponse("No file provided", 400);
   }
 
-  const buffer = await rawFile.arrayBuffer();
+  const buffer = await uploadedFile.arrayBuffer();
   const size = buffer.byteLength;
   if (size === 0) {
     return jsonErrorResponse("Empty file", 400);
@@ -139,8 +139,8 @@ export async function handleUploadRoute(req: Request): Promise<Response> {
   }
 
   const bytes = new Uint8Array(buffer);
-  const mimeType = resolveMimeType(rawFile, bytes);
-  const filename = rawFile.name;
+  const mimeType = resolveUploadedFileMimeType(uploadedFile, bytes);
+  const filename = uploadedFile.name;
 
   if (mimeType === "application/pdf") {
     const text = await extractPdfText(buffer);

@@ -10,7 +10,7 @@ export function setHighlightTheme(theme) {
   hljsLink.href = HIGHLIGHT_THEMES[theme] || HIGHLIGHT_THEMES.dark;
 }
 
-export function setThemeLabel(theme) {
+export function updateThemeToggleLabel(theme) {
   const label = document.getElementById("theme-label");
   if (!label) return;
   label.textContent = theme === "dark" ? "Modo claro" : "Modo oscuro";
@@ -22,7 +22,7 @@ export function autoResize(el, maxHeight = 240) {
   el.style.height = `${Math.min(el.scrollHeight, maxHeight)}px`;
 }
 
-export function escHtml(str) {
+export function escapeHtml(str) {
   return String(str)
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -31,6 +31,6 @@ export function escHtml(str) {
     .replace(/'/g, "&#39;");
 }
 
-export function capitalize(str) {
+export function capitalizeFirstLetter(str) {
   return str.charAt(0).toUpperCase() + str.slice(1);
 }

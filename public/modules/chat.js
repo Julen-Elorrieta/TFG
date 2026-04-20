@@ -1,6 +1,6 @@
-export function buildApiContent(msg) {
-  const files = msg.files ?? [];
-  if (files.length === 0) return msg.content;
+export function buildMessageApiContent(message) {
+  const files = message.files ?? [];
+  if (files.length === 0) return message.content;
   let extra = "";
   files.forEach((f) => {
     if (f.displayType === "image") extra += `[Imagen adjunta: ${f.name}]\n`;
@@ -9,5 +9,5 @@ export function buildApiContent(msg) {
     else if (f.displayType === "binary")
       extra += `[Archivo binario adjunto: ${f.name} (${f.mimeType})]\n`;
   });
-  return (msg.content ? `${msg.content}\n\n` : "") + extra.trim();
+  return (message.content ? `${message.content}\n\n` : "") + extra.trim();
 }

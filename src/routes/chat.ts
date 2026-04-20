@@ -8,11 +8,11 @@ type ChatRequestBody = {
   service?: string;
 };
 
-function getErrorMessage(error: unknown): string {
+function extractErrorMessageText(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function isValidChatMessage(value: unknown): value is ChatMessage {
+function isChatMessagePayload(value: unknown): value is ChatMessage {
   if (!value || typeof value !== "object") return false;
   const msg = value as Record<string, unknown>;
   const validRole =
@@ -28,12 +28,15 @@ export async function handleChatRoute(req: Request): Promise<Response> {
     return jsonErrorResponse("Invalid JSON body", 400);
   }
 
-  const { messages, service: svcName } = body;
-  if (!Array.isArray(messages) || !messages.every(isValidChatMessage)) {
+  const { messages, service: requestedServiceName } = body;
+  if (!Array.isArray(messages) || !messages.every(isChatMessagePayload)) {
     return jsonErrorResponse("Invalid messages payload", 400);
   }
 
-  if (svcName !== undefined && typeof svcName !== "string") {
+  if (
+    requestedServiceName !== undefined &&
+    typeof requestedServiceName !== "string"
+  ) {
     return jsonErrorResponse("Invalid service value", 400);
   }
 
@@ -47,8 +50,12 @@ export async function handleChatRoute(req: Request): Promise<Response> {
   }
 
   let service: AIService;
-  if (svcName && svcName !== "auto" && registry[svcName]) {
-    service = registry[svcName]!;
+  if (
+    requestedServiceName &&
+    requestedServiceName !== "auto" &&
+    registry[requestedServiceName]
+  ) {
+    service = registry[requestedServiceName]!;
   } else {
     service = pickRoundRobinService(roundRobin);
   }
@@ -61,7 +68,7 @@ export async function handleChatRoute(req: Request): Promise<Response> {
   try {
     stream = await service.chat(messages);
   } catch (err: unknown) {
-    const errorMessage = getErrorMessage(err);
+    const errorMessage = extractErrorMessageText(err);
     console.error(`[ERROR] service.chat(${service.name}):`, err);
     return jsonErrorResponse(errorMessage || "Service error", 500, {
       service: service.name.toLowerCase(),
@@ -89,7 +96,7 @@ export async function handleChatRoute(req: Request): Promise<Response> {
       } catch (err: unknown) {
         controller.enqueue(
           enc.encode(
-            `data: ${JSON.stringify({ error: getErrorMessage(err) })}\n\n`,
+            `data: ${JSON.stringify({ error: extractErrorMessageText(err) })}\n\n`,
           ),
         );
       } finally {

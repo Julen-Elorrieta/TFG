@@ -1,18 +1,18 @@
-import { buildApiContent } from "../modules/chat.js";
-import { buildExportArtifact } from "../modules/export.js";
+import { buildMessageApiContent } from "../modules/chat.js";
+import { buildConversationExportArtifact } from "../modules/export.js";
 import {
-  formatFileSize,
-  getFileIcon,
-  getFileLabel,
-  truncateFileContent,
+  formatFileSizeLabel,
+  getFileTypeIcon,
+  getFileTypeLabel,
+  truncateFileContentForPrompt,
 } from "../modules/files.js";
-import { inferUnusableServiceReason } from "../modules/settings.js";
+import { deriveUnusableServiceReason } from "../modules/settings.js";
 import {
   autoResize,
-  capitalize,
-  escHtml,
+  capitalizeFirstLetter,
+  escapeHtml,
   setHighlightTheme,
-  setThemeLabel,
+  updateThemeToggleLabel,
 } from "../modules/ui.js";
 
 const API = "";
@@ -56,13 +56,13 @@ function getErrorMessage(error, fallback = "Error desconocido") {
   return fallback;
 }
 
-function init() {
+function initializeApplication() {
   loadFromStorage();
   renderConversationList();
-  applyTheme();
+  applyThemeSetting();
   setupDragDrop();
   setupKeyboardShortcuts();
-  loadServices();
+  loadAvailableServices();
   updateSidebarKeysIndicator();
   if (!state.currentId) newConversation();
   else renderMessages();
@@ -172,7 +172,7 @@ function loadFromStorage() {
       });
     }
     loadModelsCacheFromStorage();
-    updateThemeUI();
+    refreshThemeToggleLabel();
   } catch (error) {
     console.warn("Storage load failed", error);
   }
@@ -221,7 +221,7 @@ const SERVICE_META = {
   openrouter: { icon: "🌐", label: "OpenRouter", sub: "Múltiples modelos" },
 };
 
-async function loadServices() {
+async function loadAvailableServices() {
   try {
     const res = await fetch(`${API}/services`, { headers: getApiHeaders() });
     const data = await res.json();
@@ -250,7 +250,7 @@ function renderServiceDropdown(services) {
       .map((svc) => {
         const meta = SERVICE_META[svc] || {
           icon: "🤖",
-          label: capitalize(svc),
+          label: capitalizeFirstLetter(svc),
           sub: "",
         };
         const isActive = state.selectedService === svc;
@@ -307,7 +307,7 @@ function selectService(val) {
   const label =
     val === "auto"
       ? "Rotación IA"
-      : SERVICE_META[val]?.label || capitalize(val);
+      : SERVICE_META[val]?.label || capitalizeFirstLetter(val);
   toast(`Servicio: ${label}`, "info");
 }
 
@@ -447,7 +447,7 @@ function updateKeyStatuses() {
 
 function refreshServiceStateUI(options = {}) {
   const { updateSidebarIndicator = false } = options;
-  loadServices();
+  loadAvailableServices();
   updateKeyStatuses();
   updateInputState();
   if (updateSidebarIndicator) updateSidebarKeysIndicator();
@@ -486,7 +486,7 @@ function clearKey(svc) {
   resetModelSelect(svc);
   saveToStorage();
   refreshServiceStateUI();
-  toast(`Clave ${capitalize(svc)} eliminada`, "info");
+  toast(`Clave ${capitalizeFirstLetter(svc)} eliminada`, "info");
 }
 
 function updateEnabledButton(svc) {
@@ -559,7 +559,11 @@ async function loadModelsForService(svc, opts = {}) {
     const data = await res.json();
     if (data.models && data.models.length > 0) {
       clearServiceBlocked(svc);
-      setCachedModels(svc, tempKey || state.apiKeys[svc]?.key || "", data.models);
+      setCachedModels(
+        svc,
+        tempKey || state.apiKeys[svc]?.key || "",
+        data.models,
+      );
       setSelectOptions(
         modelEl,
         data.models,
@@ -589,7 +593,7 @@ function updateServiceBadge() {
   const val = state.selectedService;
   if (label) {
     const meta = SERVICE_META?.[val];
-    label.textContent = meta ? meta.label : capitalize(val);
+    label.textContent = meta ? meta.label : capitalizeFirstLetter(val);
   }
 }
 
@@ -674,11 +678,11 @@ function clearCurrentConversation() {
   toast("Conversación limpiada", "info");
 }
 
-function getCurrentConv() {
+function getCurrentConversation() {
   return state.conversations[state.currentId] || null;
 }
 
-function updateConvTitle(id, messages) {
+function updateConversationTitle(id, messages) {
   const conv = state.conversations[id];
   if (!conv) return;
   if (messages.length > 0 && conv.title === "Nueva conversación") {
@@ -710,8 +714,13 @@ function clearSearch() {
   renderConversationList();
 }
 
-function getMsgText(m) {
-  return (m.displayText || m.rawText || m.content || "").trim();
+function getMessageTextSnippet(message) {
+  return (
+    message.displayText ||
+    message.rawText ||
+    message.content ||
+    ""
+  ).trim();
 }
 
 function renderConversationList() {
@@ -729,13 +738,15 @@ function renderConversationList() {
     convs = convs.filter(
       (c) =>
         c.title.toLowerCase().includes(q) ||
-        c.messages.some((m) => getMsgText(m).toLowerCase().includes(q)),
+        c.messages.some((m) =>
+          getMessageTextSnippet(m).toLowerCase().includes(q),
+        ),
     );
   }
 
   if (convs.length === 0) {
     list.innerHTML = q
-      ? `<div class="empty-conversations">Sin resultados para "<strong>${escHtml(q)}</strong>"</div>`
+      ? `<div class="empty-conversations">Sin resultados para "<strong>${escapeHtml(q)}</strong>"</div>`
       : '<div class="empty-conversations">No hay conversaciones aún.<br/>Empieza una nueva.</div>';
     return;
   }
@@ -746,18 +757,19 @@ function renderConversationList() {
         .filter((m) => m.role !== "system")
         .slice(-1)[0];
       const preview = lastMsg
-        ? getMsgText(lastMsg).slice(0, 60).replace(/\n/g, " ") || "Sin mensajes"
+        ? getMessageTextSnippet(lastMsg).slice(0, 60).replace(/\n/g, " ") ||
+          "Sin mensajes"
         : "Sin mensajes";
       const time = c.messages.length > 0 ? formatRelativeTime(c.createdAt) : "";
       return `
     <div class="conv-item ${c.id === state.currentId ? "active" : ""}" onclick="switchConversation('${c.id}')">
-      <div class="conv-icon">${getConvIcon(c)}</div>
+      <div class="conv-icon">${getConversationIcon(c)}</div>
       <div class="conv-meta">
         <div class="conv-title-row">
-          <span class="conv-title">${escHtml(c.title)}</span>
+          <span class="conv-title">${escapeHtml(c.title)}</span>
           ${time ? `<span class="conv-time">${time}</span>` : ""}
         </div>
-        <div class="conv-preview">${escHtml(preview)}</div>
+        <div class="conv-preview">${escapeHtml(preview)}</div>
       </div>
       <div class="conv-actions">
         <button class="conv-action-btn pin ${c.pinned ? "pinned" : ""}" onclick="pinConversation('${c.id}', event)" title="${c.pinned ? "Desanclar" : "Anclar"}">
@@ -772,10 +784,10 @@ function renderConversationList() {
     .join("");
 }
 
-function getConvIcon(conv) {
-  if (conv.pinned) return "📌";
-  if (conv.messages.length === 0) return "💬";
-  const svc = conv.usedService;
+function getConversationIcon(conversation) {
+  if (conversation.pinned) return "📌";
+  if (conversation.messages.length === 0) return "💬";
+  const svc = conversation.usedService;
   if (svc === "Groq") return "⚡";
   if (svc === "Cerebras") return "🧠";
   if (svc === "OpenRouter") return "🌐";
@@ -800,7 +812,7 @@ function formatRelativeTime(ts) {
 function renderMessages() {
   const inner = document.getElementById("messages-inner");
   if (!inner) return;
-  const conv = getCurrentConv();
+  const conv = getCurrentConversation();
 
   if (!conv || conv.messages.length === 0) {
     inner.innerHTML = `<div id="welcome">
@@ -829,7 +841,7 @@ function renderMessages() {
 function renderMessageRow(msg, idx) {
   const isUser = msg.role === "user";
   const displayContent = isUser
-    ? escHtml(msg.displayText ?? msg.content).replace(/\n/g, "<br>")
+    ? escapeHtml(msg.displayText ?? msg.content).replace(/\n/g, "<br>")
     : renderMarkdown(msg.content);
   const filesHtml =
     msg.files && msg.files.length > 0
@@ -838,7 +850,7 @@ function renderMessageRow(msg, idx) {
 
   const svcTag =
     !isUser && msg.service
-      ? `<span class="svc-tag">${msg.service}${msg.model ? ` · ${shortenModel(msg.model)}` : ""}</span>`
+      ? `<span class="svc-tag">${msg.service}${msg.model ? ` · ${shortenModelIdentifier(msg.model)}` : ""}</span>`
       : "";
 
   const timeStr = msg.timestamp ? formatTime(msg.timestamp) : "";
@@ -864,7 +876,7 @@ function renderMessageRow(msg, idx) {
   </div>`;
 }
 
-function shortenModel(model) {
+function shortenModelIdentifier(model) {
   if (!model) return "";
   // Shorten long model names
   return model.split("/").pop()?.split(":")[0]?.slice(0, 24) || model;
@@ -878,7 +890,7 @@ function formatTime(ts) {
   });
 }
 
-function addMessageToDOM(msg, idx) {
+function appendMessageToDom(msg, idx) {
   const welcome = document.getElementById("welcome");
   if (welcome) welcome.remove();
   const inner = document.getElementById("messages-inner");
@@ -900,13 +912,13 @@ function addMessageToDOM(msg, idx) {
 function renderCodeBlock(code, lang = "texto", includeLanguageClass = false) {
   return `<div class="code-block-wrapper">
           <div class="code-block-header">
-            <span class="code-lang">${escHtml(lang)}</span>
+            <span class="code-lang">${escapeHtml(lang)}</span>
             <button class="btn-copy-code" onclick="copyCodeBlock(this)">
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
               Copiar
             </button>
           </div>
-          <pre><code${includeLanguageClass ? ` class="language-${escHtml(lang)}"` : ""}>${code}</code></pre>
+          <pre><code${includeLanguageClass ? ` class="language-${escapeHtml(lang)}"` : ""}>${code}</code></pre>
         </div>`;
 }
 
@@ -924,7 +936,7 @@ function renderMarkdown(text) {
         renderCodeBlock(code),
       );
   } catch {
-    return escHtml(text);
+    return escapeHtml(text);
   }
 }
 
@@ -954,7 +966,7 @@ async function sendMessage() {
   if (!text && state.pendingFiles.length === 0) return;
   if (state.streaming) return;
 
-  const conv = getCurrentConv();
+  const conv = getCurrentConversation();
   if (!conv) return;
 
   const userMsg = {
@@ -970,14 +982,16 @@ async function sendMessage() {
       displayType: f.displayType,
       preview: f.displayType === "image" ? f.content : null,
       fileContent:
-        f.displayType === "text" ? truncateFileContent(f.content) : null,
+        f.displayType === "text"
+          ? truncateFileContentForPrompt(f.content)
+          : null,
     })),
   };
 
   conv.messages.push(userMsg);
-  updateConvTitle(state.currentId, conv.messages);
+  updateConversationTitle(state.currentId, conv.messages);
   saveToStorage();
-  addMessageToDOM(userMsg, conv.messages.length - 1);
+  appendMessageToDom(userMsg, conv.messages.length - 1);
 
   input.value = "";
   autoResize(input);
@@ -994,7 +1008,7 @@ async function streamResponse(conv, retryCount = 0) {
   if (conv.systemPrompt)
     apiMessages.push({ role: "system", content: conv.systemPrompt });
   conv.messages.forEach((m) => {
-    apiMessages.push({ role: m.role, content: buildApiContent(m) });
+    apiMessages.push({ role: m.role, content: buildMessageApiContent(m) });
   });
 
   const typingId = addTypingIndicator();
@@ -1038,7 +1052,7 @@ async function streamResponse(conv, retryCount = 0) {
       if (errData?.service) {
         const svc = String(errData.service).toLowerCase();
         if (SERVICES.includes(svc)) {
-          const reason = inferUnusableServiceReason(errData.error || "");
+          const reason = deriveUnusableServiceReason(errData.error || "");
           setServiceBlocked(svc, reason);
         }
       }
@@ -1056,7 +1070,7 @@ async function streamResponse(conv, retryCount = 0) {
     };
     conv.messages.push(assistantMsg);
     const msgIdx = conv.messages.length - 1;
-    addMessageToDOM(assistantMsg, msgIdx);
+    appendMessageToDom(assistantMsg, msgIdx);
     const bubble = document.querySelector(
       `.msg-row[data-idx="${msgIdx}"] .msg-content`,
     );
@@ -1117,7 +1131,9 @@ async function streamResponse(conv, retryCount = 0) {
       `.msg-row[data-idx="${msgIdx}"] .msg-label`,
     );
     if (label && usedService) {
-      const modelShort = usedModel ? ` · ${shortenModel(usedModel)}` : "";
+      const modelShort = usedModel
+        ? ` · ${shortenModelIdentifier(usedModel)}`
+        : "";
       label.innerHTML = `<span class="msg-author">Asistente</span> <span class="svc-tag">${usedService}${modelShort}</span>`;
     }
 
@@ -1142,7 +1158,7 @@ async function streamResponse(conv, retryCount = 0) {
       return streamResponse(conv, retryCount + 1);
     } else {
       const msg = getErrorMessage(err);
-      const reason = inferUnusableServiceReason(msg);
+      const reason = deriveUnusableServiceReason(msg);
       if (requestedService && reason)
         setServiceBlocked(requestedService, reason);
       toast("Error: " + msg, "error");
@@ -1202,7 +1218,7 @@ function stopStreaming() {
 }
 
 function copyMessage(idx) {
-  const conv = getCurrentConv();
+  const conv = getCurrentConversation();
   if (!conv) return;
   const msg = conv.messages[idx];
   if (!msg) return;
@@ -1212,7 +1228,7 @@ function copyMessage(idx) {
 }
 
 function editMessage(idx) {
-  const conv = getCurrentConv();
+  const conv = getCurrentConversation();
   if (!conv || state.streaming) return;
   const msg = conv.messages[idx];
   if (!msg || msg.role !== "user") return;
@@ -1221,7 +1237,7 @@ function editMessage(idx) {
   const bubble = row.querySelector(".msg-bubble");
   const original = msg.rawText || msg.content;
   bubble.innerHTML = `
-    <textarea class="msg-edit-area" id="edit_${idx}" rows="3">${escHtml(original)}</textarea>
+    <textarea class="msg-edit-area" id="edit_${idx}" rows="3">${escapeHtml(original)}</textarea>
     <div class="msg-edit-actions">
       <button class="panel-btn primary" style="font-size:13px;padding:6px 14px" onclick="saveEdit(${idx})">Guardar y regenerar</button>
       <button class="panel-btn ghost" style="font-size:13px;padding:6px 14px" onclick="cancelEdit(${idx})">Cancelar</button>
@@ -1235,7 +1251,7 @@ function editMessage(idx) {
 }
 
 function saveEdit(idx) {
-  const conv = getCurrentConv();
+  const conv = getCurrentConversation();
   if (!conv) return;
   const textarea = document.getElementById(`edit_${idx}`);
   if (!textarea) return;
@@ -1255,7 +1271,7 @@ function cancelEdit() {
 }
 
 function regenerateFrom(idx) {
-  const conv = getCurrentConv();
+  const conv = getCurrentConversation();
   if (!conv || state.streaming) return;
   conv.messages.splice(idx);
   saveToStorage();
@@ -1280,10 +1296,10 @@ function copyCodeBlock(btn) {
 async function handleFileInput(event) {
   const files = Array.from(event.target.files);
   event.target.value = "";
-  await processFiles(files);
+  await processUploadedFilesBatch(files);
 }
 
-async function processFile(file) {
+async function processUploadedFile(file) {
   const toastId = toastProgress(`Procesando ${file.name}...`);
   const formData = new FormData();
   formData.append("file", file);
@@ -1310,8 +1326,8 @@ async function processFile(file) {
   }
 }
 
-async function processFiles(files) {
-  for (const file of files) await processFile(file);
+async function processUploadedFilesBatch(files) {
+  for (const file of files) await processUploadedFile(file);
 }
 
 function renderFilePreviews() {
@@ -1321,16 +1337,16 @@ function renderFilePreviews() {
     .map((f, i) => {
       if (f.displayType === "image" && f.content) {
         return `<div class="file-preview-chip img-preview-chip">
-        <img class="fp-thumb" src="data:${f.mimeType};base64,${f.content}" alt="${escHtml(f.name)}"/>
-        <span class="fp-name-overlay">${escHtml(f.name)}</span>
+        <img class="fp-thumb" src="data:${f.mimeType};base64,${f.content}" alt="${escapeHtml(f.name)}"/>
+        <span class="fp-name-overlay">${escapeHtml(f.name)}</span>
         <button class="fp-remove" onclick="removeFile(${i})" title="Quitar">✕</button>
       </div>`;
       }
       return `<div class="file-preview-chip">
-      <span class="fp-icon">${getFileIcon(f.mimeType)}</span>
+      <span class="fp-icon">${getFileTypeIcon(f.mimeType)}</span>
       <div style="display:flex;flex-direction:column;gap:1px;min-width:0;flex:1">
-        <span class="fp-name">${escHtml(f.name)}</span>
-        <span class="fp-type">${getFileLabel(f.mimeType, f.name)}${f.size ? " · " + formatFileSize(f.size) : ""}</span>
+        <span class="fp-name">${escapeHtml(f.name)}</span>
+        <span class="fp-type">${getFileTypeLabel(f.mimeType, f.name)}${f.size ? " · " + formatFileSizeLabel(f.size) : ""}</span>
       </div>
       <button class="fp-remove" onclick="removeFile(${i})" title="Quitar">✕</button>
     </div>`;
@@ -1349,18 +1365,18 @@ function clearFilePreviews() {
 }
 
 function renderFileChip(f) {
-  const label = getFileLabel(f.mimeType, f.name);
-  const size = f.size ? formatFileSize(f.size) : "";
+  const label = getFileTypeLabel(f.mimeType, f.name);
+  const size = f.size ? formatFileSizeLabel(f.size) : "";
   if (f.displayType === "image" && f.preview) {
     return `<div class="msg-file-chip img-chip" onclick="openLightbox('data:${f.mimeType};base64,${f.preview}')" title="Ampliar imagen">
-      <img class="fc-thumb" src="data:${f.mimeType};base64,${f.preview}" alt="${escHtml(f.name)}"/>
+      <img class="fc-thumb" src="data:${f.mimeType};base64,${f.preview}" alt="${escapeHtml(f.name)}"/>
       <div class="fc-thumb-overlay"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div>
     </div>`;
   }
   return `<div class="msg-file-chip doc-chip">
-    <span class="fc-icon">${getFileIcon(f.mimeType)}</span>
+    <span class="fc-icon">${getFileTypeIcon(f.mimeType)}</span>
     <div class="fc-info">
-      <div class="fc-name">${escHtml(f.name)}</div>
+      <div class="fc-name">${escapeHtml(f.name)}</div>
       <div class="fc-meta">${label}${size ? " · " + size : ""}</div>
     </div>
   </div>`;
@@ -1378,15 +1394,15 @@ function openLightbox(src) {
   }
   document.getElementById("lb-img").src = src;
   lb.classList.add("open");
-  document.addEventListener("keydown", lbKeyHandler);
+  document.addEventListener("keydown", handleLightboxKeydown);
 }
 
 function closeLightbox() {
   document.getElementById("lightbox")?.classList.remove("open");
-  document.removeEventListener("keydown", lbKeyHandler);
+  document.removeEventListener("keydown", handleLightboxKeydown);
 }
 
-function lbKeyHandler(e) {
+function handleLightboxKeydown(e) {
   if (e.key === "Escape") closeLightbox();
 }
 
@@ -1407,7 +1423,7 @@ function setupDragDrop() {
     e.preventDefault();
     if (wrap) wrap.classList.remove("drag-over");
     const files = Array.from(e.dataTransfer.files);
-    await processFiles(files);
+    await processUploadedFilesBatch(files);
   });
 }
 
@@ -1418,14 +1434,14 @@ function toggleSystemPanel() {
   const isOpen = panel.classList.toggle("open");
   if (btn) btn.classList.toggle("active", isOpen);
   if (isOpen) {
-    const conv = getCurrentConv();
+    const conv = getCurrentConversation();
     const sysEl = document.getElementById("system-prompt-input");
     if (sysEl) sysEl.value = conv?.systemPrompt || "";
   }
 }
 
 function saveSystemPrompt() {
-  const conv = getCurrentConv();
+  const conv = getCurrentConversation();
   if (!conv) return;
   const sysEl = document.getElementById("system-prompt-input");
   conv.systemPrompt = sysEl?.value || "";
@@ -1436,7 +1452,7 @@ function saveSystemPrompt() {
 function clearSystemPrompt() {
   const sysEl = document.getElementById("system-prompt-input");
   if (sysEl) sysEl.value = "";
-  const conv = getCurrentConv();
+  const conv = getCurrentConversation();
   if (conv) {
     conv.systemPrompt = "";
     saveToStorage();
@@ -1469,7 +1485,7 @@ function applyTemplate(key) {
 }
 
 function openExport() {
-  const conv = getCurrentConv();
+  const conv = getCurrentConversation();
   if (!conv || conv.messages.length === 0) {
     toast("No hay mensajes para exportar", "info");
     return;
@@ -1481,9 +1497,9 @@ function closeExport() {
 }
 
 function exportAs(format) {
-  const conv = getCurrentConv();
+  const conv = getCurrentConversation();
   if (!conv) return;
-  const { content, ext, mime } = buildExportArtifact(conv, format);
+  const { content, ext, mime } = buildConversationExportArtifact(conv, format);
   const blob = new Blob([content], { type: mime });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -1499,19 +1515,19 @@ function toggleTheme() {
   const current = document.documentElement.getAttribute("data-theme");
   const next = current === "dark" ? "light" : "dark";
   document.documentElement.setAttribute("data-theme", next);
-  updateThemeUI();
+  refreshThemeToggleLabel();
   setHighlightTheme(next);
   saveToStorage();
 }
 
-function updateThemeUI() {
+function refreshThemeToggleLabel() {
   const theme = document.documentElement.getAttribute("data-theme");
-  setThemeLabel(theme);
+  updateThemeToggleLabel(theme);
 }
 
-function applyTheme() {
+function applyThemeSetting() {
   const theme = document.documentElement.getAttribute("data-theme");
-  updateThemeUI();
+  refreshThemeToggleLabel();
   setHighlightTheme(theme);
 }
 
@@ -1618,7 +1634,7 @@ function toast(msg, type = "info", duration = 3500) {
   const icons = { info: "●", success: "✓", error: "✕" };
   const toastEntry = appendToast(
     type,
-    `<span class="toast-icon">${icons[type] || "●"}</span><span>${escHtml(msg)}</span>`,
+    `<span class="toast-icon">${icons[type] || "●"}</span><span>${escapeHtml(msg)}</span>`,
   );
   if (!toastEntry) return;
   const { id, el } = toastEntry;
@@ -1632,7 +1648,7 @@ function toast(msg, type = "info", duration = 3500) {
 function toastProgress(msg) {
   const toastEntry = appendToast(
     "info",
-    `<span class="toast-spinner"></span><span>${escHtml(msg)}</span>`,
+    `<span class="toast-spinner"></span><span>${escapeHtml(msg)}</span>`,
   );
   return toastEntry?.id ?? null;
 }
@@ -1691,4 +1707,4 @@ Object.assign(globalThis, {
   closeLightbox,
 });
 
-init();
+initializeApplication();
