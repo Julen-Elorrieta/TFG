@@ -1,19 +1,19 @@
-import { buildApiContent } from "./modules/chat.js";
-import { buildExportArtifact } from "./modules/export.js";
+import { buildApiContent } from "../modules/chat.js";
+import { buildExportArtifact } from "../modules/export.js";
 import {
   formatFileSize,
   getFileIcon,
   getFileLabel,
   truncateFileContent,
-} from "./modules/files.js";
-import { inferUnusableServiceReason } from "./modules/settings.js";
+} from "../modules/files.js";
+import { inferUnusableServiceReason } from "../modules/settings.js";
 import {
   autoResize,
   capitalize,
   escHtml,
   setHighlightTheme,
   setThemeLabel,
-} from "./modules/ui.js";
+} from "../modules/ui.js";
 
 const API = "";
 
