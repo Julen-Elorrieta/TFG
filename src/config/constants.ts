@@ -1,7 +1,7 @@
 import type { AIService } from "../types/ai";
 import { join } from "node:path";
 
-function resolvePublicFile(filename: string): string {
+export function resolvePublicFile(filename: string): string {
   const dir = import.meta.dir.replace(/\\/g, "/").toLowerCase();
   if (dir.endsWith("/src/config")) {
     return join(import.meta.dir, "../../public", filename);
@@ -24,10 +24,35 @@ export const openRouterHeaders = {
   "X-Title": "NeuralChat",
 };
 
+export const staticModuleNames = [
+  "chat",
+  "export",
+  "files",
+  "settings",
+  "ui",
+] as const;
+
+type StaticModuleName = (typeof staticModuleNames)[number];
+
+function getStaticModuleFile(name: StaticModuleName): Blob {
+  return Bun.file(resolvePublicFile(`modules/${name}.js`));
+}
+
+function createStaticModuleFiles(): Record<StaticModuleName, Blob> {
+  return {
+    chat: getStaticModuleFile("chat"),
+    export: getStaticModuleFile("export"),
+    files: getStaticModuleFile("files"),
+    settings: getStaticModuleFile("settings"),
+    ui: getStaticModuleFile("ui"),
+  };
+}
+
 export const staticFiles = {
   html: Bun.file(resolvePublicFile("index.html")),
   css: Bun.file(resolvePublicFile("style.css")),
   js: Bun.file(resolvePublicFile("app.js")),
+  modules: createStaticModuleFiles(),
 };
 
 let rrIndex = 0;

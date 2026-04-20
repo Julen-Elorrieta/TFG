@@ -1,4 +1,4 @@
-import { corsHeaders, staticFiles } from "./config/constants";
+import { corsHeaders, staticFiles, staticModuleNames } from "./config/constants";
 import { handleChatRoute } from "./routes/chat";
 import { handleModelsRoute } from "./routes/models";
 import { handleServicesRoute } from "./routes/services";
@@ -11,6 +11,7 @@ type StaticAsset = {
 };
 
 type RouteHandler = (req: Request) => Promise<Response>;
+const JS_CONTENT_TYPE = "application/javascript; charset=utf-8";
 
 function mapStaticAsset(
   paths: string[],
@@ -18,6 +19,16 @@ function mapStaticAsset(
   contentType: string,
 ): Array<[string, StaticAsset]> {
   return paths.map((path) => [path, { file, contentType }]);
+}
+
+function mapModuleAssets(): Array<[string, StaticAsset]> {
+  return staticModuleNames.map((name) => [
+    `/modules/${name}.js`,
+    {
+      file: staticFiles.modules[name],
+      contentType: JS_CONTENT_TYPE,
+    },
+  ]);
 }
 
 const staticAssets: Record<string, StaticAsset> = Object.fromEntries([
@@ -34,8 +45,9 @@ const staticAssets: Record<string, StaticAsset> = Object.fromEntries([
   ...mapStaticAsset(
     ["/app.js", "/js/app.js"],
     staticFiles.js,
-    "application/javascript; charset=utf-8",
+    JS_CONTENT_TYPE,
   ),
+  ...mapModuleAssets(),
 ]);
 
 const apiRoutes: Record<string, RouteHandler> = {

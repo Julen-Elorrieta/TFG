@@ -1,3 +1,20 @@
+import { buildApiContent } from "./modules/chat.js";
+import { buildExportArtifact } from "./modules/export.js";
+import {
+  formatFileSize,
+  getFileIcon,
+  getFileLabel,
+  truncateFileContent,
+} from "./modules/files.js";
+import { inferUnusableServiceReason } from "./modules/settings.js";
+import {
+  autoResize,
+  capitalize,
+  escHtml,
+  setHighlightTheme,
+  setThemeLabel,
+} from "./modules/ui.js";
+
 const API = "";
 
 const DEFAULT_MODELS = {
@@ -11,11 +28,6 @@ const SERVICE_HEADERS = {
   groq: { key: "X-Groq-Key", model: "X-Groq-Model" },
   cerebras: { key: "X-Cerebras-Key", model: "X-Cerebras-Model" },
   openrouter: { key: "X-Openrouter-Key", model: "X-Openrouter-Model" },
-};
-const HIGHLIGHT_THEMES = {
-  dark: "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/tokyo-night-dark.min.css",
-  light:
-    "https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css",
 };
 const modelLoadTimers = {};
 const lastAutoLoadedKeys = {};
@@ -42,12 +54,6 @@ function getErrorMessage(error, fallback = "Error desconocido") {
   if (error instanceof Error && error.message) return error.message;
   if (typeof error === "string" && error.trim()) return error;
   return fallback;
-}
-
-function setHighlightTheme(theme) {
-  const hljsLink = document.getElementById("hljs-theme");
-  if (!hljsLink) return;
-  hljsLink.href = HIGHLIGHT_THEMES[theme] || HIGHLIGHT_THEMES.dark;
 }
 
 function init() {
@@ -200,32 +206,6 @@ function ensureSelectableService() {
     state.selectedService = "auto";
     saveToStorage();
   }
-}
-
-function inferUnusableServiceReason(message = "") {
-  const msg = String(message).toLowerCase();
-  if (
-    msg.includes("insufficient credits") ||
-    msg.includes("402") ||
-    msg.includes("quota")
-  ) {
-    return "Sin créditos";
-  }
-  if (
-    msg.includes("model_not_found") ||
-    msg.includes("does not exist") ||
-    msg.includes("not_found")
-  ) {
-    return "Modelo no disponible";
-  }
-  if (
-    msg.includes("unauthorized") ||
-    msg.includes("invalid api key") ||
-    msg.includes("401")
-  ) {
-    return "API key inválida";
-  }
-  return "";
 }
 
 function hasAnyApiKey() {
@@ -1007,33 +987,6 @@ async function sendMessage() {
   await streamResponse(conv);
 }
 
-const MAX_FILE_CHARS = 8000;
-
-function truncateFileContent(text) {
-  if (!text) return "";
-  if (text.length <= MAX_FILE_CHARS) return text;
-  const half = Math.floor(MAX_FILE_CHARS / 2);
-  return (
-    text.slice(0, half) +
-    `\n\n[... contenido truncado — ${text.length.toLocaleString()} caracteres totales ...]\n\n` +
-    text.slice(-half)
-  );
-}
-
-function buildApiContent(msg) {
-  const files = msg.files ?? [];
-  if (files.length === 0) return msg.content;
-  let extra = "";
-  files.forEach((f) => {
-    if (f.displayType === "image") extra += `[Imagen adjunta: ${f.name}]\n`;
-    else if (f.fileContent)
-      extra += `\n--- Archivo: ${f.name} ---\n${f.fileContent}\n---\n`;
-    else if (f.displayType === "binary")
-      extra += `[Archivo binario adjunto: ${f.name} (${f.mimeType})]\n`;
-  });
-  return (msg.content ? msg.content + "\n\n" : "") + extra.trim();
-}
-
 async function streamResponse(conv, retryCount = 0) {
   setStreaming(true);
 
@@ -1395,42 +1348,6 @@ function clearFilePreviews() {
   renderFilePreviews();
 }
 
-function getFileIcon(mimeType) {
-  if (!mimeType) return "📎";
-  if (mimeType.startsWith("image/")) return "🖼️";
-  if (mimeType === "application/pdf") return "📄";
-  if (mimeType.includes("json")) return "🔧";
-  if (mimeType.includes("csv")) return "📊";
-  if (
-    mimeType.includes("python") ||
-    mimeType.includes("javascript") ||
-    mimeType.includes("typescript")
-  )
-    return "💻";
-  if (mimeType.startsWith("text/")) return "📝";
-  return "📎";
-}
-
-function getFileLabel(mimeType, filename) {
-  if (!mimeType) return "Archivo";
-  if (mimeType.startsWith("image/"))
-    return mimeType.split("/")[1].toUpperCase();
-  if (mimeType === "application/pdf") return "PDF";
-  if (mimeType.includes("json")) return "JSON";
-  if (mimeType.includes("csv")) return "CSV";
-  const ext = filename?.split(".").pop()?.toUpperCase();
-  if (ext) return ext;
-  if (mimeType.startsWith("text/")) return "TEXTO";
-  return "ARCHIVO";
-}
-
-function formatFileSize(bytes) {
-  if (!bytes) return "";
-  if (bytes < 1024) return bytes + " B";
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
-  return (bytes / (1024 * 1024)).toFixed(1) + " MB";
-}
-
 function renderFileChip(f) {
   const label = getFileLabel(f.mimeType, f.name);
   const size = f.size ? formatFileSize(f.size) : "";
@@ -1566,48 +1483,7 @@ function closeExport() {
 function exportAs(format) {
   const conv = getCurrentConv();
   if (!conv) return;
-  let content = "",
-    ext = "",
-    mime = "";
-  if (format === "markdown") {
-    content = `# ${conv.title}\n\n_Exportado: ${new Date().toLocaleString()}_\n\n---\n\n`;
-    if (conv.systemPrompt)
-      content += `**System Prompt:** ${conv.systemPrompt}\n\n---\n\n`;
-    conv.messages.forEach((m) => {
-      const service = m.service
-        ? ` (${m.service}${m.model ? ` · ${m.model}` : ""})`
-        : "";
-      content += `## ${m.role === "user" ? "👤 Tú" : `🤖 Asistente${service}`}\n\n${m.content}\n\n---\n\n`;
-    });
-    ext = "md";
-    mime = "text/markdown";
-  } else if (format === "json") {
-    content = JSON.stringify(
-      {
-        title: conv.title,
-        exportedAt: new Date().toISOString(),
-        systemPrompt: conv.systemPrompt,
-        messages: conv.messages.map((m) => ({
-          role: m.role,
-          content: m.content,
-          service: m.service,
-          model: m.model,
-          timestamp: m.timestamp,
-        })),
-      },
-      null,
-      2,
-    );
-    ext = "json";
-    mime = "application/json";
-  } else {
-    content = `${conv.title}\nExportado: ${new Date().toLocaleString()}\n${"=".repeat(50)}\n\n`;
-    conv.messages.forEach((m) => {
-      content += `[${m.role === "user" ? "TÚ" : `ASISTENTE${m.service ? ` - ${m.service}` : ""}`}]\n${m.content}\n\n${"-".repeat(40)}\n\n`;
-    });
-    ext = "txt";
-    mime = "text/plain";
-  }
+  const { content, ext, mime } = buildExportArtifact(conv, format);
   const blob = new Blob([content], { type: mime });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -1630,9 +1506,7 @@ function toggleTheme() {
 
 function updateThemeUI() {
   const theme = document.documentElement.getAttribute("data-theme");
-  const label = document.getElementById("theme-label");
-  if (label)
-    label.textContent = theme === "dark" ? "Modo claro" : "Modo oscuro";
+  setThemeLabel(theme);
 }
 
 function applyTheme() {
@@ -1714,24 +1588,6 @@ function closeMobileSidebar() {
   document.getElementById("sidebar")?.classList.remove("mobile-open");
 }
 
-function autoResize(el) {
-  el.style.height = "auto";
-  el.style.height = Math.min(el.scrollHeight, 240) + "px";
-}
-
-function escHtml(str) {
-  return String(str)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
-function capitalize(str) {
-  return str.charAt(0).toUpperCase() + str.slice(1);
-}
-
 function useChip(text) {
   if (!hasAnyApiKey()) {
     openSettings();
@@ -1789,5 +1645,50 @@ function removeToast(id) {
     setTimeout(() => el.remove(), 200);
   }
 }
+
+Object.assign(globalThis, {
+  newConversation,
+  switchConversation,
+  deleteConversation,
+  pinConversation,
+  clearCurrentConversation,
+  onSearchInput,
+  clearSearch,
+  openSettings,
+  closeSettings,
+  onApiKeyInput,
+  saveSettings,
+  clearKey,
+  copyApiKey,
+  toggleKeyVisibility,
+  toggleServiceEnabled,
+  loadModelsForService,
+  openExport,
+  closeExport,
+  exportAs,
+  toggleTheme,
+  toggleSidebar,
+  toggleSystemPanel,
+  saveSystemPrompt,
+  clearSystemPrompt,
+  applyTemplate,
+  toggleServiceDropdown,
+  selectService,
+  handleKeydown,
+  autoResize,
+  handleFileInput,
+  sendMessage,
+  stopStreaming,
+  useChip,
+  copyMessage,
+  editMessage,
+  saveEdit,
+  cancelEdit,
+  regenerateFrom,
+  copyCodeBlock,
+  removeFile,
+  openLightbox,
+  closeLightbox,
+});
 
 init();

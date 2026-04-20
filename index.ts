@@ -1,5 +1,14 @@
-if (process.env.NODE_ENV !== "production") {
-  process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+
+function configureTrustedCa(): void {
+  if (process.env.NODE_EXTRA_CA_CERTS) return;
+  const localCa = join(process.cwd(), "zscaler.crt");
+  if (existsSync(localCa)) {
+    process.env.NODE_EXTRA_CA_CERTS = localCa;
+  }
 }
 
-import "./src/server";
+configureTrustedCa();
+
+await import("./src/server");
