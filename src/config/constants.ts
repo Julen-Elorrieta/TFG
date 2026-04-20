@@ -50,7 +50,7 @@ function buildStaticModuleFileMap(): Record<StaticModuleName, Blob> {
 
 export const staticFiles = {
   html: Bun.file(resolvePublicAssetPath("index.html")),
-  css: Bun.file(resolvePublicAssetPath("style.css")),
+  css: Bun.file(resolvePublicAssetPath("css/style.css")),
   js: Bun.file(resolvePublicAssetPath("js/app.js")),
   modules: buildStaticModuleFileMap(),
 };

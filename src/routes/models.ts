@@ -372,9 +372,13 @@ export async function handleModelsRoute(req: Request): Promise<Response> {
 
   try {
     const listed = await fetchListedModelsForService(serviceParam, keys);
-    const models = validate
+    const validatedModels = validate
       ? await validateModelsForService(serviceParam, listed, keys)
       : listed;
+    const models =
+      validate && validatedModels.length === 0 && listed.length > 0
+        ? listed
+        : validatedModels;
     setCachedModels(cacheKey, models);
     return createModelsResponse(models);
   } catch (error: unknown) {

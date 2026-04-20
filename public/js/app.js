@@ -553,23 +553,42 @@ async function loadModelsForService(svc, opts = {}) {
   loadBtn.textContent = "Validando...";
   setModelSelectLoading(svc);
   try {
-    const res = await fetch(`${API}/models?service=${svc}&validate=1`, {
-      headers: tempHeaders,
-    });
-    const data = await res.json();
-    if (data.models && data.models.length > 0) {
+    const fetchModels = async (validateOnly) => {
+      const query = validateOnly
+        ? `service=${svc}&validate=1`
+        : `service=${svc}`;
+      const res = await fetch(`${API}/models?${query}`, {
+        headers: tempHeaders,
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      return Array.isArray(data?.models) ? data.models : [];
+    };
+
+    let models = await fetchModels(true);
+    let loadedWithoutValidation = false;
+
+    if (models.length === 0) {
+      models = await fetchModels(false);
+      loadedWithoutValidation = models.length > 0;
+    }
+
+    if (models.length > 0) {
       clearServiceBlocked(svc);
       setCachedModels(
         svc,
         tempKey || state.apiKeys[svc]?.key || "",
-        data.models,
+        models,
       );
       setSelectOptions(
         modelEl,
-        data.models,
+        models,
         state.apiKeys[svc]?.model || DEFAULT_MODELS[svc],
       );
-      if (!silent) toast(`${data.models.length} modelos cargados`, "success");
+      if (!silent) {
+        const extra = loadedWithoutValidation ? " (sin validación previa)" : "";
+        toast(`${models.length} modelos cargados${extra}`, "success");
+      }
     } else {
       setServiceBlocked(svc, "Sin modelos válidos");
       clearCachedModels(svc);
@@ -577,7 +596,8 @@ async function loadModelsForService(svc, opts = {}) {
       if (!silent)
         toast("No hay modelos disponibles para esta API key", "error");
     }
-  } catch {
+  } catch (error) {
+    console.error(`[ERROR] loadModelsForService(${svc}):`, error);
     setServiceBlocked(svc, "Error de validación");
     clearCachedModels(svc);
     setModelSelectLoading(svc, "Error validando modelos");
