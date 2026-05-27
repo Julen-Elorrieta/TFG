@@ -5,7 +5,14 @@
   "private": true,
   "scripts": {
     "start": "bun run index.ts",
-    "dev": "bun --watch run index.ts"
+    "dev": "bun --watch run index.ts",
+    "serve": "bun run dist/index.js",
+    "build": "bun run build:server && bun run build:public",
+    "build:server": "bun build index.ts --outdir dist --target bun --minify",
+    "build:public": "bun run build:public:js && bun run build:public:modules && bun run build:public:copy",
+    "build:public:js": "bun build public/js/app.js --outdir dist/public/js --target browser --minify",
+    "build:public:modules": "bun build public/modules/chat.js public/modules/export.js public/modules/files.js public/modules/settings.js public/modules/ui.js --outdir dist/public/modules --target browser --minify",
+    "build:public:copy": "bun -e \"const fs=require('fs'); fs.cpSync('public/index.html','dist/public/index.html',{force:true}); fs.cpSync('public/css','dist/public/css',{recursive:true,force:true});\""
   },
   "peerDependencies": {
     "typescript": "^5.9.3"
