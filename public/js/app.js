@@ -575,11 +575,7 @@ async function loadModelsForService(svc, opts = {}) {
 
     if (models.length > 0) {
       clearServiceBlocked(svc);
-      setCachedModels(
-        svc,
-        tempKey || state.apiKeys[svc]?.key || "",
-        models,
-      );
+      setCachedModels(svc, tempKey || state.apiKeys[svc]?.key || "", models);
       setSelectOptions(
         modelEl,
         models,
